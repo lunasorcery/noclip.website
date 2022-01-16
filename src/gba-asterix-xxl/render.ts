@@ -181,7 +181,7 @@ class MeshFragData {
             { location: AsterixProgram.a_TexCoord0, bufferIndex: 2, bufferByteOffset: 0x00, format: GfxFormat.F32_RG },
         ];
         const vertexBufferDescriptors: (GfxInputLayoutBufferDescriptor | null)[] = [
-            { byteStride: 0x10, frequency: GfxVertexBufferFrequency.PerVertex, },
+            { byteStride: 0x0C, frequency: GfxVertexBufferFrequency.PerVertex, },
             this.colorBuffer ? { byteStride: 0x04, frequency: GfxVertexBufferFrequency.PerVertex } : null,
             this.uvBuffer ? { byteStride: 0x08, frequency: GfxVertexBufferFrequency.PerVertex } : null,
         ];
@@ -238,7 +238,7 @@ class MapData {
 
         const numCells = 12 * lvl.lvlHeader.numStrips;
         const vertsPerCell = 4;
-        const floatsPerVert = 4;
+        const floatsPerVert = 3;
         const floatsPerUv = 2;
         const indicesPerCell = 6;
 
@@ -273,27 +273,17 @@ class MapData {
                         : 0xffbfbfbf;
 
                     const currQuadVertBase = vertIdx / floatsPerVert;
-                    if (isColored) {
-                        indicesColored[idxIdx++] = currQuadVertBase + 0;
-                        indicesColored[idxIdx++] = currQuadVertBase + 2;
-                        indicesColored[idxIdx++] = currQuadVertBase + 1;
-                        indicesColored[idxIdx++] = currQuadVertBase + 1;
-                        indicesColored[idxIdx++] = currQuadVertBase + 2;
-                        indicesColored[idxIdx++] = currQuadVertBase + 3;
-                    }
-                    if (isTextured) {
-                        indicesTextured[idxIdx++] = currQuadVertBase + 0;
-                        indicesTextured[idxIdx++] = currQuadVertBase + 2;
-                        indicesTextured[idxIdx++] = currQuadVertBase + 1;
-                        indicesTextured[idxIdx++] = currQuadVertBase + 1;
-                        indicesTextured[idxIdx++] = currQuadVertBase + 2;
-                        indicesTextured[idxIdx++] = currQuadVertBase + 3;
-                    }
+                    let indices = isColored ? indicesColored : indicesTextured;
+                    indices[idxIdx++] = currQuadVertBase + 0;
+                    indices[idxIdx++] = currQuadVertBase + 2;
+                    indices[idxIdx++] = currQuadVertBase + 1;
+                    indices[idxIdx++] = currQuadVertBase + 1;
+                    indices[idxIdx++] = currQuadVertBase + 2;
+                    indices[idxIdx++] = currQuadVertBase + 3;
 
                     vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x0].x;
                     vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x0].y;
                     vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x0].z;
-                    vertices[vertIdx++] = 1.0;
                     colors[colIdx++] = color;
                     uvs[uvIdx++] = quad.uvs[3].u / 256.0;
                     uvs[uvIdx++] = (quad.uvs[3].v + (texId*256.0)) / 656.0;
@@ -301,7 +291,6 @@ class MapData {
                     vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].x;
                     vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].y;
                     vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].z;
-                    vertices[vertIdx++] = 1.0;
                     colors[colIdx++] = color;
                     uvs[uvIdx++] = quad.uvs[2].u / 256.0;
                     uvs[uvIdx++] = (quad.uvs[2].v + (texId*256.0)) / 656.0;
@@ -309,7 +298,6 @@ class MapData {
                     vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].x;
                     vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].y;
                     vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].z;
-                    vertices[vertIdx++] = 1.0;
                     colors[colIdx++] = color;
                     uvs[uvIdx++] = quad.uvs[0].u / 256.0;
                     uvs[uvIdx++] = (quad.uvs[0].v + (texId*256.0)) / 656.0;
@@ -317,7 +305,6 @@ class MapData {
                     vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].x;
                     vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].y;
                     vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].z;
-                    vertices[vertIdx++] = 1.0;
                     colors[colIdx++] = color;
                     uvs[uvIdx++] = quad.uvs[1].u / 256.0;
                     uvs[uvIdx++] = (quad.uvs[1].v + (texId*256.0)) / 656.0;
