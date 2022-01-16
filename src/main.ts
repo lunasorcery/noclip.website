@@ -79,6 +79,7 @@ import * as Scenes_DiddyKongRacing from './DiddyKongRacing/scenes';
 import * as Scenes_SpongebobRevengeOfTheFlyingDutchman from "./SpongebobRevengeOfTheFlyingDutchman/scenes";
 import * as Scenes_MarioKart8Deluxe from './MarioKart8Deluxe/Scenes';
 import * as Scenes_JetSetRadio from './JetSetRadio/Scenes';
+import * as Scenes_GbaAsterixXXL from './gba-asterix-xxl/scenes';
 
 import { DroppedFileSceneDesc, traverseFileSystemDataTransfer } from './Scenes_FileDrops';
 
@@ -104,6 +105,8 @@ import { WebXRContext } from './WebXR';
 import { debugJunk } from './DebugJunk';
 
 const sceneGroups = [
+    "Game Boy Advance",
+    Scenes_GbaAsterixXXL.sceneGroup,
     "Wii",
     Scenes_MarioKartWii.sceneGroup,
     Scenes_KirbysReturnToDreamLand.sceneGroup,
