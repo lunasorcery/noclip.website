@@ -9,7 +9,7 @@ import { makeStaticDataBuffer, makeStaticDataBufferFromSlice } from "../gfx/help
 import { DeviceProgram } from "../Program";
 import { convertToTriangleIndexBuffer, filterDegenerateTriangleIndexBuffer } from "../gfx/helpers/TopologyHelpers";
 import { fillMatrix4x3, fillMatrix4x4, fillVec4, fillVec4v } from "../gfx/helpers/UniformBufferHelpers";
-import { mat4, ReadonlyMat4 } from "gl-matrix";
+import { mat4, ReadonlyMat4, vec2, vec3, vec4 } from "gl-matrix";
 import { Camera, computeViewSpaceDepthFromWorldSpaceAABB } from "../Camera";
 import ArrayBufferSlice from "../ArrayBufferSlice";
 import { GfxRenderHelper } from "../gfx/render/GfxRenderHelper";
@@ -20,9 +20,18 @@ import { GfxrAttachmentSlot } from '../gfx/render/GfxRenderGraph';
 import { AABB } from '../Geometry';
 import { setAttachmentStateSimple } from '../gfx/helpers/GfxMegaStateDescriptorHelpers';
 import { GfxRenderCache } from "../gfx/render/GfxRenderCache";
+import { GfxTopology } from "../gfx/helpers/TopologyHelpers";
 
 function expand5bitTo8bit(v5: number): number {
     return (v5 << 3) | (v5 >> 2);
+}
+
+function decodeBGR555(bgr555: number): number {
+    const r = expand5bitTo8bit((bgr555 >> 0) & 0x1f);
+    const g = expand5bitTo8bit((bgr555 >> 5) & 0x1f);
+    const b = expand5bitTo8bit((bgr555 >> 10) & 0x1f);
+    const a = 0xff;
+    return (a << 24) | (b << 16) | (g << 8) | (r);
 }
 
 function decodeTextureData(width: number, height: number, indices: Uint8Array, palette: Uint16Array): DecodedSurfaceSW {
@@ -65,16 +74,15 @@ export class AsterixTextureHolder extends TextureHolder<AsterixTexture> {
         const levelDatas: Uint8Array[] = [];
         const surfaces: HTMLCanvasElement[] = [];
 
-        let mipWidth = texture.width, mipHeight = texture.height;
         const pixels = texture.indices.createTypedArray(Uint8Array);
-        const decodedSurface = decodeTextureData(mipWidth, mipHeight, pixels, texture.palette);
+        const decodedSurface = decodeTextureData(texture.width, texture.height, pixels, texture.palette);
         levelDatas.push(decodedSurface.pixels as Uint8Array);
 
         const canvas = document.createElement('canvas');
         surfaceToCanvas(canvas, decodedSurface);
         surfaces.push(canvas);
 
-        const gfxTexture = device.createTexture(makeTextureDescriptor2D(GfxFormat.U8_RGBA_NORM, texture.width, texture.height, pixels.length));
+        const gfxTexture = device.createTexture(makeTextureDescriptor2D(GfxFormat.U8_RGBA_NORM, texture.width, texture.height, levelDatas.length));
         device.uploadTextureData(gfxTexture, 0, levelDatas);
 
         const viewerTexture: Viewer.Texture = { name: texture.name, surfaces };
@@ -110,23 +118,19 @@ layout(std140) uniform ub_MeshFragParams {
 };
 
 uniform sampler2D u_Texture;
-uniform sampler2D u_TextureDetail;
-uniform sampler2D u_TextureLightmap;
 
 varying vec4 v_Color;
-varying vec4 v_TexCoord;
+varying vec2 v_TexCoord;
 
 #ifdef VERT
 layout(location = ${AsterixProgram.a_Position}) in vec3 a_Position;
 layout(location = ${AsterixProgram.a_Color}) in vec4 a_Color;
 layout(location = ${AsterixProgram.a_TexCoord0}) in vec2 a_TexCoord0;
-layout(location = ${AsterixProgram.a_TexCoord1}) in vec2 a_TexCoord1;
 
 void main() {
     gl_Position = Mul(u_Projection, Mul(_Mat4x4(u_BoneMatrix[0]), vec4(a_Position, 1.0)));
     v_Color = a_Color;
-    v_TexCoord.xy = a_TexCoord0 + u_TexCoordOffs.xy;
-    v_TexCoord.zw = a_TexCoord1;
+    v_TexCoord = a_TexCoord0 + u_TexCoordOffs.xy;
 }
 #endif
 
@@ -135,44 +139,20 @@ void main() {
     vec4 t_Color = vec4(1.0);
 
 #ifdef USE_TEXTURE
-    t_Color *= texture(SAMPLER_2D(u_Texture), v_TexCoord.xy);
-#endif
-
-#ifdef USE_LIGHTMAP
-    t_Color.rgb *= texture(SAMPLER_2D(u_TextureLightmap), v_TexCoord.zw).rgb;
+    t_Color *= texture(SAMPLER_2D(u_Texture), v_TexCoord);
+    if (t_Color.a <= 0.5) {
+        discard;
+    }
 #endif
 
 #ifdef USE_VERTEX_COLOR
-    // TODO(jstpierre): How is the vertex color buffer used?
-    t_Color.rgb *= clamp(v_Color.rgb * 4.0, 0.0, 1.0);
-    t_Color.a *= v_Color.a;
-#endif
-
-#ifdef USE_ALPHA_TEST
-    // TODO(jstpierre): Configurable alpha ref?
-    if (t_Color.a < 0.5)
-        discard;
+    t_Color.rgb *= v_Color.rgb;
 #endif
 
     gl_FragColor = t_Color;
 }
 #endif
 `;
-}
-
-function decodeStreamUV(buffer: ArrayBufferSlice, iVertCount: number, streamUVCount: number, uvCoordScale: number): Float32Array {
-    const view = buffer.createDataView();
-    const dst = new Float32Array(2 * streamUVCount * iVertCount);
-    let dstIdx = 0;
-    let srcOffs = 0;
-    for (let i = 0; i < iVertCount; i++) {
-        for (let j = 0; j < streamUVCount; j++) {
-            dst[dstIdx++] = view.getInt16(srcOffs + 0x00, true) / 0x7FFF * uvCoordScale;
-            dst[dstIdx++] = view.getInt16(srcOffs + 0x02, true) / 0x7FFF * uvCoordScale;
-            srcOffs += 0x04;
-        }
-    }
-    return dst;
 }
 
 class MeshFragData {
@@ -187,13 +167,7 @@ class MeshFragData {
     constructor(device: GfxDevice, public meshFrag: EMeshFrag) {
         this.posNrmBuffer = makeStaticDataBufferFromSlice(device, GfxBufferUsage.Vertex, meshFrag.streamPosNrm);
         this.colorBuffer = meshFrag.streamColor ? makeStaticDataBufferFromSlice(device, GfxBufferUsage.Vertex, meshFrag.streamColor) : null;
-
-        if (meshFrag.streamUVCount > 0) {
-            const uvData = decodeStreamUV(meshFrag.streamUV!, meshFrag.iVertCount, meshFrag.streamUVCount, meshFrag.uvCoordScale);
-            this.uvBuffer = makeStaticDataBuffer(device, GfxBufferUsage.Vertex, uvData.buffer);
-        } else {
-            this.uvBuffer = null;
-        }
+        this.uvBuffer = meshFrag.streamUV ? makeStaticDataBufferFromSlice(device, GfxBufferUsage.Vertex, meshFrag.streamUV) : null;
 
         const numIndexes = meshFrag.streamIdx.byteLength / 2;
         const triIdxData = convertToTriangleIndexBuffer(meshFrag.topology, meshFrag.streamIdx.createTypedArray(Uint16Array, 0, numIndexes));
@@ -205,12 +179,11 @@ class MeshFragData {
             { location: AsterixProgram.a_Position, bufferIndex: 0, bufferByteOffset: 0, format: GfxFormat.F32_RGB },
             { location: AsterixProgram.a_Color, bufferIndex: 1, bufferByteOffset: 0, format: GfxFormat.U8_RGBA_NORM },
             { location: AsterixProgram.a_TexCoord0, bufferIndex: 2, bufferByteOffset: 0x00, format: GfxFormat.F32_RG },
-            { location: AsterixProgram.a_TexCoord1, bufferIndex: 2, bufferByteOffset: 0x08 * (meshFrag.streamUVCount - 1), format: GfxFormat.F32_RG },
         ];
         const vertexBufferDescriptors: (GfxInputLayoutBufferDescriptor | null)[] = [
             { byteStride: 0x10, frequency: GfxVertexBufferFrequency.PerVertex, },
             this.colorBuffer ? { byteStride: 0x04, frequency: GfxVertexBufferFrequency.PerVertex } : null,
-            this.uvBuffer ? { byteStride: 0x08 * meshFrag.streamUVCount, frequency: GfxVertexBufferFrequency.PerVertex } : null,
+            this.uvBuffer ? { byteStride: 0x08, frequency: GfxVertexBufferFrequency.PerVertex } : null,
         ];
 
         this.inputLayout = device.createInputLayout({
@@ -241,39 +214,169 @@ class MeshFragData {
 
 class MeshData {
     public meshFragData: MeshFragData[] = [];
-    public submeshData: MeshData[] = [];
 
     constructor(device: GfxDevice, public mesh: EMesh) {
-        for (let i = 0; i < this.mesh.meshFrag.length; i++)
+        for (let i = 0; i < this.mesh.meshFrag.length; i++) {
             this.meshFragData[i] = new MeshFragData(device, this.mesh.meshFrag[i]);
-        for (let i = 0; i < this.mesh.submesh.length; i++)
-            this.submeshData[i] = new MeshData(device, this.mesh.submesh[i]);
+        }
     }
 
     public destroy(device: GfxDevice): void {
-        for (let i = 0; i < this.meshFragData.length; i++)
+        for (let i = 0; i < this.meshFragData.length; i++) {
             this.meshFragData[i].destroy(device);
-        for (let i = 0; i < this.submeshData.length; i++)
-            this.submeshData[i].destroy(device);
+        }
     }
 }
 
-class DomainData {
+class MapData {
     public meshData: MeshData[] = [];
-    public subdomainData: DomainData[] = [];
 
-    constructor(device: GfxDevice, public domain: EDomain) {
-        for (let i = 0; i < domain.meshes.length; i++)
-            this.meshData[i] = new MeshData(device, domain.meshes[i]);
-        for (let i = 0; i < domain.subdomains.length; i++)
-            this.subdomainData[i] = new DomainData(device, domain.subdomains[i]);
+    constructor(device: GfxDevice, public lvl: AsterixLvl) {
+        //for (let i = 0; i < lvl.meshes.length; i++) {
+        //    this.meshData[i] = new MeshData(device, domain.meshes[i]);
+        //}
+
+        const numCells = 12 * lvl.lvlHeader.numStrips;
+        const vertsPerCell = 4;
+        const floatsPerVert = 4;
+        const floatsPerUv = 2;
+        const indicesPerCell = 6;
+
+        let vertices = new Float32Array(numCells * vertsPerCell * floatsPerVert);
+        let colors = new Uint32Array(numCells * vertsPerCell);
+        let uvs = new Float32Array(numCells * vertsPerCell * floatsPerUv);
+        let indicesColored = new Uint16Array(numCells * indicesPerCell);
+        let indicesTextured = new Uint16Array(numCells * indicesPerCell);
+        let vertIdx = 0;
+        let colIdx = 0;
+        let uvIdx = 0;
+        let idxIdx = 0;
+        for (let strip = 0; strip < lvl.lvlHeader.numStrips; ++strip) {
+            const s0 = strip;
+            const s1 = strip + 1;
+            for (let x = 0; x < 12; ++x) {
+                const x0 = x;
+                const x1 = x + 1;
+
+                const materialAttr = lvl.materialAttrs[s0 * 12 + x0];
+                const quadIdx = materialAttr.textureQuadIndex;
+                const quad = lvl.textureQuads[quadIdx];
+
+                const doRender = (quad.flags & 0x1) != 0;
+                const isTextured = (quad.flags & 0x2) != 0;
+                const isColored = !isTextured;
+                const texId = quad.flags >> 4;
+
+                if (doRender) {
+                    const color = isColored
+                        ? decodeBGR555(lvl.palette[quad.uvs[0].u])
+                        : 0xffbfbfbf;
+
+                    const currQuadVertBase = vertIdx / floatsPerVert;
+                    if (isColored) {
+                        indicesColored[idxIdx++] = currQuadVertBase + 0;
+                        indicesColored[idxIdx++] = currQuadVertBase + 2;
+                        indicesColored[idxIdx++] = currQuadVertBase + 1;
+                        indicesColored[idxIdx++] = currQuadVertBase + 1;
+                        indicesColored[idxIdx++] = currQuadVertBase + 2;
+                        indicesColored[idxIdx++] = currQuadVertBase + 3;
+                    }
+                    if (isTextured) {
+                        indicesTextured[idxIdx++] = currQuadVertBase + 0;
+                        indicesTextured[idxIdx++] = currQuadVertBase + 2;
+                        indicesTextured[idxIdx++] = currQuadVertBase + 1;
+                        indicesTextured[idxIdx++] = currQuadVertBase + 1;
+                        indicesTextured[idxIdx++] = currQuadVertBase + 2;
+                        indicesTextured[idxIdx++] = currQuadVertBase + 3;
+                    }
+
+                    vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x0].x;
+                    vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x0].y;
+                    vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x0].z;
+                    vertices[vertIdx++] = 1.0;
+                    colors[colIdx++] = color;
+                    uvs[uvIdx++] = quad.uvs[3].u / 256.0;
+                    uvs[uvIdx++] = (quad.uvs[3].v + (texId*256.0)) / 656.0;
+
+                    vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].x;
+                    vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].y;
+                    vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].z;
+                    vertices[vertIdx++] = 1.0;
+                    colors[colIdx++] = color;
+                    uvs[uvIdx++] = quad.uvs[2].u / 256.0;
+                    uvs[uvIdx++] = (quad.uvs[2].v + (texId*256.0)) / 656.0;
+
+                    vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].x;
+                    vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].y;
+                    vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].z;
+                    vertices[vertIdx++] = 1.0;
+                    colors[colIdx++] = color;
+                    uvs[uvIdx++] = quad.uvs[0].u / 256.0;
+                    uvs[uvIdx++] = (quad.uvs[0].v + (texId*256.0)) / 656.0;
+
+                    vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].x;
+                    vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].y;
+                    vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].z;
+                    vertices[vertIdx++] = 1.0;
+                    colors[colIdx++] = color;
+                    uvs[uvIdx++] = quad.uvs[1].u / 256.0;
+                    uvs[uvIdx++] = (quad.uvs[1].v + (texId*256.0)) / 656.0;
+                }
+            }
+        }
+
+        let dummy: EMesh = {
+            name: 'test',
+            translation: vec3.fromValues(0, 0, 0),
+            rotation: vec3.fromValues(0, 0, 0),
+            scale: vec3.fromValues(0, 0, 0),
+            bbox: new AABB(),
+            modelTriggerOBB: [],
+            skeleton: [],
+            meshFrag: [{
+                materialFlags: 0,
+                bbox: new AABB(),
+                materialColor: vec4.fromValues(0, 0, 0, 1),
+                textureIds: [],
+                textureLightmap: null,
+                textureDetail: null,
+                texCoordTransVel: vec2.fromValues(0, 0),
+                streamPosNrm: new ArrayBufferSlice(vertices.buffer),
+                streamColor: new ArrayBufferSlice(colors.buffer),
+                streamUVCount: 0,
+                uvCoordScale: 1,
+                streamUV: null,
+                streamIdx: new ArrayBufferSlice(indicesColored.buffer),
+                topology: GfxTopology.TRIANGLES,
+                iVertCount: vertices.length/4,
+                iPolyCount: indicesColored.length/3,
+            },{
+                materialFlags: 0,
+                bbox: new AABB(),
+                materialColor: vec4.fromValues(0, 0, 0, 1),
+                textureIds: [0],
+                textureLightmap: null,
+                textureDetail: null,
+                texCoordTransVel: vec2.fromValues(0, 0),
+                streamPosNrm: new ArrayBufferSlice(vertices.buffer),
+                streamColor: null,
+                streamUVCount: 0,
+                uvCoordScale: 1,
+                streamUV: new ArrayBufferSlice(uvs.buffer),
+                streamIdx: new ArrayBufferSlice(indicesTextured.buffer),
+                topology: GfxTopology.TRIANGLES,
+                iVertCount: vertices.length/4,
+                iPolyCount: indicesTextured.length/3,
+            }],
+            submesh: []
+        }
+        this.meshData[0] = new MeshData(device, dummy);
     }
 
     public destroy(device: GfxDevice): void {
-        for (let i = 0; i < this.meshData.length; i++)
+        for (let i = 0; i < this.meshData.length; i++) {
             this.meshData[i].destroy(device);
-        for (let i = 0; i < this.subdomainData.length; i++)
-            this.subdomainData[i].destroy(device);
+        }
     }
 }
 
@@ -282,44 +385,36 @@ const scratchAABB = new AABB();
 class MeshFragInstance {
     private gfxProgram: GfxProgram | null = null;
     private program: AsterixProgram;
-    private textureMapping = nArray(3, () => new TextureMapping());
+    private textureMapping = nArray(1, () => new TextureMapping());
     private megaState: Partial<GfxMegaStateDescriptor> = {};
     private sortKey: number = 0;
     private visible = true;
 
-    constructor(cache: GfxRenderCache, scene: EScene, textureHolder: AsterixTextureHolder, public meshFragData: MeshFragData) {
+    constructor(cache: GfxRenderCache, lvl: AsterixLvl, textureHolder: AsterixTextureHolder, public meshFragData: MeshFragData) {
         this.program = new AsterixProgram();
 
         const meshFrag = this.meshFragData.meshFrag;
 
         const gfxSampler = cache.createSampler({
-            magFilter: GfxTexFilterMode.Bilinear,
-            minFilter: GfxTexFilterMode.Bilinear,
-            mipFilter: GfxMipFilterMode.Linear,
+            magFilter: GfxTexFilterMode.Point,
+            minFilter: GfxTexFilterMode.Point,
+            mipFilter: GfxMipFilterMode.NoMip,
             wrapS: GfxWrapMode.Repeat,
             wrapT: GfxWrapMode.Repeat,
         });
 
         const fillTextureReference = (dst: TextureMapping, textureId: number) => {
-            const textureReference = scene.textureReferences[textureId];
-
-            if (textureHolder.hasTexture(textureReference.textureName)) {
-                textureHolder.fillTextureMapping(dst, textureReference.textureName);
+            if (textureHolder.hasTexture('tex')) {
+                textureHolder.fillTextureMapping(dst, 'tex');
             } else {
-                dst.gfxTexture = null;
+                dst.gfxTexture = null
             }
-
             dst.gfxSampler = gfxSampler;
         };
 
         if (meshFrag.textureIds.length >= 1) {
             this.program.setDefineBool('USE_TEXTURE', true);
             fillTextureReference(this.textureMapping[0], meshFrag.textureIds[0]);
-        }
-
-        if (meshFrag.textureLightmap !== null) {
-            this.program.setDefineBool('USE_LIGHTMAP', true);
-            fillTextureReference(this.textureMapping[2], meshFrag.textureLightmap);
         }
 
         let useAlphaTest: boolean;
@@ -355,9 +450,6 @@ class MeshFragInstance {
 
         if (meshFrag.streamColor !== null)
             this.program.setDefineBool('USE_VERTEX_COLOR', true);
-
-        // TODO(jstpierre): Some way of determining whether to use alpha test?
-        this.program.setDefineBool('USE_ALPHA_TEST', useAlphaTest);
     }
 
     public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, modelMatrix: ReadonlyMat4, viewerInput: Viewer.ViewerRenderInput) {
@@ -404,62 +496,54 @@ class MeshFragInstance {
 
 class MeshInstance {
     private meshFragInstance: MeshFragInstance[] = [];
-    private submeshInstance: MeshInstance[] = [];
     public modelMatrix = mat4.create();
     private visible = true;
 
-    constructor(cache: GfxRenderCache, scene: EScene, textureHolder: AsterixTextureHolder, public meshData: MeshData) {
-        for (let i = 0; i < this.meshData.meshFragData.length; i++)
-            this.meshFragInstance[i] = new MeshFragInstance(cache, scene, textureHolder, this.meshData.meshFragData[i])
-        for (let i = 0; i < this.meshData.submeshData.length; i++)
-            this.submeshInstance[i] = new MeshInstance(cache, scene, textureHolder, this.meshData.submeshData[i]);
+    constructor(cache: GfxRenderCache, lvl: AsterixLvl, textureHolder: AsterixTextureHolder, public meshData: MeshData) {
+        for (let i = 0; i < this.meshData.meshFragData.length; i++) {
+            this.meshFragInstance[i] = new MeshFragInstance(cache, lvl, textureHolder, this.meshData.meshFragData[i])
+        }
     }
 
     public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput): void {
         if (!this.visible)
             return;
 
-        for (let i = 0; i < this.meshFragInstance.length; i++)
+        for (let i = 0; i < this.meshFragInstance.length; i++) {
             this.meshFragInstance[i].prepareToRender(device, renderInstManager, this.modelMatrix, viewerInput);
-        for (let i = 0; i < this.submeshInstance.length; i++)
-            this.submeshInstance[i].prepareToRender(device, renderInstManager, viewerInput);
+        }
     }
 
     public destroy(device: GfxDevice): void {
-        for (let i = 0; i < this.meshFragInstance.length; i++)
+        for (let i = 0; i < this.meshFragInstance.length; i++) {
             this.meshFragInstance[i].destroy(device);
-        for (let i = 0; i < this.submeshInstance.length; i++)
-            this.submeshInstance[i].destroy(device);
+        }
     }
 }
 
-class DomainInstance {
+class MapInstance {
     public meshInstance: MeshInstance[] = [];
-    public subdomainInstance: DomainInstance[] = [];
     private visible = true;
 
-    constructor(cache: GfxRenderCache, scene: EScene, textureHolder: AsterixTextureHolder, public domainData: DomainData) {
-        for (let i = 0; i < this.domainData.meshData.length; i++)
-            this.meshInstance[i] = new MeshInstance(cache, scene, textureHolder, this.domainData.meshData[i]);
-        for (let i = 0; i < this.domainData.subdomainData.length; i++)
-            this.subdomainInstance[i] = new DomainInstance(cache, scene, textureHolder, this.domainData.subdomainData[i]);
+    constructor(cache: GfxRenderCache, lvl: AsterixLvl, textureHolder: AsterixTextureHolder, public mapData: MapData) {
+        for (let i = 0; i < this.mapData.meshData.length; i++) {
+            this.meshInstance[i] = new MeshInstance(cache, lvl, textureHolder, this.mapData.meshData[i]);
+        }
     }
 
     public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput): void {
         if (!this.visible)
             return;
 
-        for (let i = 0; i < this.meshInstance.length; i++)
+        for (let i = 0; i < this.meshInstance.length; i++) {
             this.meshInstance[i].prepareToRender(device, renderInstManager, viewerInput);
-        for (let i = 0; i < this.subdomainInstance.length; i++)
-            this.subdomainInstance[i].prepareToRender(device, renderInstManager, viewerInput);
+        }
     }
 
     public destroy(device: GfxDevice): void {
-        for (let i = 0; i < this.meshInstance.length; i++)
+        for (let i = 0; i < this.meshInstance.length; i++) {
             this.meshInstance[i].destroy(device);
-        for (let i = 0; i < this.subdomainInstance.length; i++)
-            this.subdomainInstance[i].destroy(device);
+        }
     }
 }
 
@@ -468,20 +552,15 @@ function fillSceneParamsData(d: Float32Array, camera: Camera, offs: number = 0):
 }
 
 const bindingLayouts: GfxBindingLayoutDescriptor[] = [
-    { numUniformBuffers: 2, numSamplers: 3 },
+    { numUniformBuffers: 2, numSamplers: 1 },
 ];
 export class SceneRenderer {
-    //private domainData: DomainData;
-    //private domainInstance: DomainInstance;
-
-    //constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, public scene: EScene) {
-    //    this.domainData = new DomainData(cache.device, this.scene.domain);
-    //    this.domainInstance = new DomainInstance(cache, scene, textureHolder, this.domainData);
-    //}
+    private mapData: MapData;
+    private mapInstance: MapInstance;
 
     constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, lvl: AsterixLvl) {
-        //this.domainData = new DomainData(cache.device, this.scene.domain);
-        //this.domainInstance = new DomainInstance(cache, scene, textureHolder, this.domainData);
+        this.mapData = new MapData(cache.device, lvl);
+        this.mapInstance = new MapInstance(cache, lvl, textureHolder, this.mapData);
     }
 
     public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput): void {
@@ -492,13 +571,13 @@ export class SceneRenderer {
         const sceneParamsMapped = template.mapUniformBufferF32(AsterixProgram.ub_SceneParams);
         fillSceneParamsData(sceneParamsMapped, viewerInput.camera, offs);
 
-        //this.domainInstance.prepareToRender(device, renderInstManager, viewerInput);
+        this.mapInstance.prepareToRender(device, renderInstManager, viewerInput);
         renderInstManager.popTemplateRenderInst();
     }
 
     public destroy(device: GfxDevice): void {
-        //this.domainInstance.destroy(device);
-        //this.domainData.destroy(device);
+        this.mapInstance.destroy(device);
+        this.mapData.destroy(device);
     }
 }
 
@@ -523,8 +602,9 @@ export class AsterixRenderer {
 
     public prepareToRender(device: GfxDevice, viewerInput: Viewer.ViewerRenderInput): void {
         this.renderHelper.pushTemplateRenderInst();
-        for (let i = 0; i < this.sceneRenderers.length; i++)
+        for (let i = 0; i < this.sceneRenderers.length; i++) {
             this.sceneRenderers[i].prepareToRender(device, this.renderHelper.renderInstManager, viewerInput);
+        }
         this.renderHelper.renderInstManager.popTemplateRenderInst();
         this.renderHelper.prepareToRender();
     }
@@ -557,7 +637,8 @@ export class AsterixRenderer {
     public destroy(device: GfxDevice): void {
         this.renderHelper.destroy();
         this.textureHolder.destroy(device);
-        for (let i = 0; i < this.sceneRenderers.length; i++)
+        for (let i = 0; i < this.sceneRenderers.length; i++) {
             this.sceneRenderers[i].destroy(device);
+        }
     }
 }

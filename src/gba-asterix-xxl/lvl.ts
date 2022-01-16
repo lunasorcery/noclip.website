@@ -2,7 +2,8 @@
 import ArrayBufferSlice from "../ArrayBufferSlice";
 import { DataStream } from "./DataStream";
 
-const V3D_LEVEL_WIDTH = 12;
+const V3D_LEVEL_WIDTH_CELLS = 12;
+const V3D_LEVEL_WIDTH_VERTS = (V3D_LEVEL_WIDTH_CELLS+1);
 
 interface AsterixUv {
     u: number;
@@ -96,8 +97,8 @@ function readAsterixVertex(stream: DataStream): AsterixVertex {
 
 function readAsterixVertexTable(stream: DataStream, header: AsterixLvlHeader): AsterixVertex[] {
     let verts: AsterixVertex[] = [];
-    for (let strip = 0; strip <= header.numStrips; strip++) {
-        for (let x = 0; x <= V3D_LEVEL_WIDTH; x++) {
+    for (let strip = 0; strip < header.numStrips+1; strip++) {
+        for (let x = 0; x < V3D_LEVEL_WIDTH_VERTS; x++) {
             verts.push(readAsterixVertex(stream));
         }
     }
@@ -113,7 +114,7 @@ function readAsterixMaterialAttr(stream: DataStream): AsterixMaterialAttr {
 function readAsterixMaterialAttrTable(stream: DataStream, header: AsterixLvlHeader): AsterixMaterialAttr[] {
     let attrs: AsterixMaterialAttr[] = [];
     for (let strip = 0; strip < header.numStrips; strip++) {
-        for (let x = 0; x < V3D_LEVEL_WIDTH; x++) {
+        for (let x = 0; x < V3D_LEVEL_WIDTH_CELLS; x++) {
             attrs.push(readAsterixMaterialAttr(stream));
         }
     }
@@ -128,7 +129,7 @@ function readAsterixCollisionSpan(stream: DataStream): AsterixCollisionSpan {
 
 function readAsterixCollisionSpanTable(stream: DataStream, header: AsterixLvlHeader): AsterixCollisionSpan[] {
     let spans: AsterixCollisionSpan[] = [];
-    for (let strip = 0; strip <= header.numStrips; strip++) {
+    for (let strip = 0; strip < header.numStrips+1; strip++) {
         spans.push(readAsterixCollisionSpan(stream));
     }
     return spans;
@@ -137,7 +138,7 @@ function readAsterixCollisionSpanTable(stream: DataStream, header: AsterixLvlHea
 function readAsterixEnvSpriteOffsets(stream: DataStream, header: AsterixLvlHeader): number[] {
     let offsets: number[] = [];
     for (let strip = 0; strip < header.numStrips; strip++) {
-        for (let x = 0; x < V3D_LEVEL_WIDTH; x++) {
+        for (let x = 0; x < V3D_LEVEL_WIDTH_CELLS; x++) {
             offsets.push(stream.readInt16());
         }
     }
