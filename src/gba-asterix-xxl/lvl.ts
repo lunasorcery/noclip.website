@@ -49,6 +49,12 @@ export interface AsterixLvl {
     envSpriteOffsets: number[];
 }
 
+export const enum Version {
+    PrototypeA = 0,
+    PrototypeB = 1,
+    Retail = 2,
+}
+
 function readAsterixPalette(stream: DataStream): Uint16Array {
     let palette = new Uint16Array(256);
     for (let i = 0; i < 256; i++) {
@@ -80,11 +86,11 @@ function readAsterixTextureQuadTable(stream: DataStream): AsterixTextureQuad[] {
     return quads;
 }
 
-function readAsterixLvlHeader(stream: DataStream): AsterixLvlHeader {
+function readAsterixLvlHeader(stream: DataStream, version: Version): AsterixLvlHeader {
     const numStrips = stream.readUint32();
     const unknown1 = stream.readUint32();
-    const unknown2 = stream.readUint32();
-    const unknown3 = stream.readUint32();
+    const unknown2 = (version >= Version.PrototypeB) ? stream.readUint32() : 0;
+    const unknown3 = (version >= Version.Retail) ? stream.readUint32() : 0;
     return { numStrips, unknown1, unknown2, unknown3 };
 }
 
@@ -145,12 +151,12 @@ function readAsterixEnvSpriteOffsets(stream: DataStream, header: AsterixLvlHeade
     return offsets;
 }
 
-export function parse(buffer: ArrayBufferSlice): AsterixLvl {
+export function parse(buffer: ArrayBufferSlice, version: Version): AsterixLvl {
     const stream = new DataStream(buffer);
 
     const palette = readAsterixPalette(stream);
     const textureQuads = readAsterixTextureQuadTable(stream);
-    const lvlHeader = readAsterixLvlHeader(stream);
+    const lvlHeader = readAsterixLvlHeader(stream, version);
     const vertexTable = readAsterixVertexTable(stream, lvlHeader);
     const materialAttrs = readAsterixMaterialAttrTable(stream, lvlHeader);
     const collisionSpans0 = readAsterixCollisionSpanTable(stream, lvlHeader);
