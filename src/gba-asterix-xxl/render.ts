@@ -35,7 +35,27 @@ function decodeBGR555(bgr555: number): number {
 }
 
 function decodeTextureData(width: number, height: number, indices: Uint8Array, palette: Uint16Array): DecodedSurfaceSW {
-    assert(indices.length == width * height);
+
+    let decodedPixels = new Uint8Array(width * height * 4);
+    let srcIdx = 0;
+    let dstIdx = 0;
+    for (let i = 0; i < indices.length; ++i) {
+        let colorIdx = indices[i];
+        let r = 0, g = 0, b = 0, a = 0;
+        if (colorIdx != 0) {
+            let bgr555 = palette[colorIdx];
+            r = expand5bitTo8bit((bgr555 >> 0) & 0x1f);
+            g = expand5bitTo8bit((bgr555 >> 5) & 0x1f);
+            b = expand5bitTo8bit((bgr555 >> 10) & 0x1f);
+            a = 0xff;
+        }
+        decodedPixels[dstIdx++] = r;
+        decodedPixels[dstIdx++] = g;
+        decodedPixels[dstIdx++] = b;
+        decodedPixels[dstIdx++] = a;
+    }
+
+    /*assert(indices.length == width * height);
     let decodedPixels = new Uint8Array(width * height * 4);
     let srcIdx = 0;
     let dstIdx = 0;
@@ -55,7 +75,7 @@ function decodeTextureData(width: number, height: number, indices: Uint8Array, p
             decodedPixels[dstIdx++] = b;
             decodedPixels[dstIdx++] = a;
         }
-    }
+    }*/
     return { type: 'RGBA', flag: 'SRGB', width, height, depth: 1, pixels: decodedPixels };
 }
 
@@ -98,7 +118,6 @@ class AsterixProgram extends DeviceProgram {
     public static a_Position = 0;
     public static a_Color = 1;
     public static a_TexCoord0 = 2;
-    public static a_TexCoord1 = 3;
 
     public static ub_SceneParams = 0;
     public static ub_MeshFragParams = 1;
@@ -117,20 +136,24 @@ layout(std140) uniform ub_MeshFragParams {
     vec4 u_TexCoordOffs;
 };
 
-uniform sampler2D u_Texture;
+uniform sampler2D u_TexLevel0;
+uniform sampler2D u_TexLevel1;
+uniform sampler2D u_TexLevel2;
 
 varying vec4 v_Color;
 varying vec2 v_TexCoord;
+flat varying int v_TexId;
 
 #ifdef VERT
 layout(location = ${AsterixProgram.a_Position}) in vec3 a_Position;
 layout(location = ${AsterixProgram.a_Color}) in vec4 a_Color;
-layout(location = ${AsterixProgram.a_TexCoord0}) in vec2 a_TexCoord0;
+layout(location = ${AsterixProgram.a_TexCoord0}) in vec3 a_TexCoord0;
 
 void main() {
     gl_Position = Mul(u_Projection, Mul(_Mat4x4(u_BoneMatrix[0]), vec4(a_Position, 1.0)));
     v_Color = a_Color;
-    v_TexCoord = a_TexCoord0 + u_TexCoordOffs.xy;
+    v_TexCoord = vec2(a_TexCoord0.xy);
+    v_TexId = int(a_TexCoord0.z);
 }
 #endif
 
@@ -139,14 +162,16 @@ void main() {
     vec4 t_Color = vec4(1.0);
 
 #ifdef USE_TEXTURE
-    t_Color *= texture(SAMPLER_2D(u_Texture), v_TexCoord);
-    if (t_Color.a <= 0.5) {
-        discard;
-    }
+    vec2 texCoord = v_TexCoord / 256.;
+    if (v_TexId == 0) { t_Color = texture(SAMPLER_2D(u_TexLevel0), texCoord); }
+    if (v_TexId == 1) { t_Color = texture(SAMPLER_2D(u_TexLevel1), texCoord); }
+    if (v_TexId == 2) { t_Color = texture(SAMPLER_2D(u_TexLevel2), texCoord); }
+
+    if (t_Color.a == 0.0) { discard; }
 #endif
 
 #ifdef USE_VERTEX_COLOR
-    t_Color.rgb *= v_Color.rgb;
+    t_Color.rgb = v_Color.rgb;
 #endif
 
     gl_FragColor = t_Color;
@@ -176,14 +201,14 @@ class MeshFragData {
         this.indexCount = idxData.length;
 
         const vertexAttributeDescriptors: GfxVertexAttributeDescriptor[] = [
-            { location: AsterixProgram.a_Position, bufferIndex: 0, bufferByteOffset: 0, format: GfxFormat.F32_RGB },
-            { location: AsterixProgram.a_Color, bufferIndex: 1, bufferByteOffset: 0, format: GfxFormat.U8_RGBA_NORM },
-            { location: AsterixProgram.a_TexCoord0, bufferIndex: 2, bufferByteOffset: 0x00, format: GfxFormat.F32_RG },
+            { location: AsterixProgram.a_Position,  bufferIndex: 0, bufferByteOffset: 0, format: GfxFormat.S16_RGB },
+            { location: AsterixProgram.a_Color,     bufferIndex: 1, bufferByteOffset: 0, format: GfxFormat.U8_RGBA_NORM },
+            { location: AsterixProgram.a_TexCoord0, bufferIndex: 2, bufferByteOffset: 0, format: GfxFormat.U8_RGB },
         ];
         const vertexBufferDescriptors: (GfxInputLayoutBufferDescriptor | null)[] = [
-            { byteStride: 0x0C, frequency: GfxVertexBufferFrequency.PerVertex, },
+            { byteStride: 0x06, frequency: GfxVertexBufferFrequency.PerVertex, },
             this.colorBuffer ? { byteStride: 0x04, frequency: GfxVertexBufferFrequency.PerVertex } : null,
-            this.uvBuffer ? { byteStride: 0x08, frequency: GfxVertexBufferFrequency.PerVertex } : null,
+            this.uvBuffer    ? { byteStride: 0x03, frequency: GfxVertexBufferFrequency.PerVertex } : null,
         ];
 
         this.inputLayout = device.createInputLayout({
@@ -194,7 +219,7 @@ class MeshFragData {
         const buffers: (GfxVertexBufferDescriptor | null)[] = [
             { buffer: this.posNrmBuffer, byteOffset: 0 },
             this.colorBuffer ? { buffer: this.colorBuffer, byteOffset: 0, } : null,
-            this.uvBuffer ? { buffer: this.uvBuffer, byteOffset: 0, } : null,
+            this.uvBuffer    ? { buffer: this.uvBuffer,    byteOffset: 0, } : null,
         ];
         const idxBuffer: GfxIndexBufferDescriptor = { buffer: this.idxBuffer, byteOffset: 0 };
         this.inputState = device.createInputState(this.inputLayout, buffers, idxBuffer);
@@ -232,19 +257,15 @@ class MapData {
     public meshData: MeshData[] = [];
 
     constructor(device: GfxDevice, public lvl: AsterixLvl) {
-        //for (let i = 0; i < lvl.meshes.length; i++) {
-        //    this.meshData[i] = new MeshData(device, domain.meshes[i]);
-        //}
-
         const numCells = 12 * lvl.lvlHeader.numStrips;
         const vertsPerCell = 4;
-        const floatsPerVert = 3;
-        const floatsPerUv = 2;
+        const channelsPerVert = 3;
+        const channelsPerUv = 3;
         const indicesPerCell = 6;
 
-        let vertices = new Float32Array(numCells * vertsPerCell * floatsPerVert);
+        let vertices = new Int16Array(numCells * vertsPerCell * channelsPerVert);
         let colors = new Uint32Array(numCells * vertsPerCell);
-        let uvs = new Float32Array(numCells * vertsPerCell * floatsPerUv);
+        let uvs = new Uint8Array(numCells * vertsPerCell * channelsPerUv);
         let indicesColored = new Uint16Array(numCells * indicesPerCell);
         let indicesTextured = new Uint16Array(numCells * indicesPerCell);
         let vertIdx = 0;
@@ -270,9 +291,9 @@ class MapData {
                 if (doRender) {
                     const color = isColored
                         ? decodeBGR555(lvl.palette[quad.uvs[0].u])
-                        : 0xffbfbfbf;
+                        : 0;
 
-                    const currQuadVertBase = vertIdx / floatsPerVert;
+                    const currQuadVertBase = vertIdx / channelsPerVert;
                     let indices = isColored ? indicesColored : indicesTextured;
                     indices[idxIdx++] = currQuadVertBase + 0;
                     indices[idxIdx++] = currQuadVertBase + 2;
@@ -285,29 +306,33 @@ class MapData {
                     vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x0].y;
                     vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x0].z;
                     colors[colIdx++] = color;
-                    uvs[uvIdx++] = quad.uvs[3].u / 256.0;
-                    uvs[uvIdx++] = (quad.uvs[3].v + (texId*256.0)) / 656.0;
+                    uvs[uvIdx++] = quad.uvs[3].u;
+                    uvs[uvIdx++] = quad.uvs[3].v;
+                    uvs[uvIdx++] = texId;
 
                     vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].x;
                     vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].y;
                     vertices[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].z;
                     colors[colIdx++] = color;
-                    uvs[uvIdx++] = quad.uvs[2].u / 256.0;
-                    uvs[uvIdx++] = (quad.uvs[2].v + (texId*256.0)) / 656.0;
+                    uvs[uvIdx++] = quad.uvs[2].u;
+                    uvs[uvIdx++] = quad.uvs[2].v;
+                    uvs[uvIdx++] = texId;
 
                     vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].x;
                     vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].y;
                     vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].z;
                     colors[colIdx++] = color;
-                    uvs[uvIdx++] = quad.uvs[0].u / 256.0;
-                    uvs[uvIdx++] = (quad.uvs[0].v + (texId*256.0)) / 656.0;
+                    uvs[uvIdx++] = quad.uvs[0].u;
+                    uvs[uvIdx++] = quad.uvs[0].v;
+                    uvs[uvIdx++] = texId;
 
                     vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].x;
                     vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].y;
                     vertices[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].z;
                     colors[colIdx++] = color;
-                    uvs[uvIdx++] = quad.uvs[1].u / 256.0;
-                    uvs[uvIdx++] = (quad.uvs[1].v + (texId*256.0)) / 656.0;
+                    uvs[uvIdx++] = quad.uvs[1].u;
+                    uvs[uvIdx++] = quad.uvs[1].v;
+                    uvs[uvIdx++] = texId;
                 }
             }
         }
@@ -372,7 +397,7 @@ const scratchAABB = new AABB();
 class MeshFragInstance {
     private gfxProgram: GfxProgram | null = null;
     private program: AsterixProgram;
-    private textureMapping = nArray(1, () => new TextureMapping());
+    private textureMapping = nArray(3, () => new TextureMapping());
     private megaState: Partial<GfxMegaStateDescriptor> = {};
     private sortKey: number = 0;
     private visible = true;
@@ -390,18 +415,20 @@ class MeshFragInstance {
             wrapT: GfxWrapMode.Repeat,
         });
 
-        const fillTextureReference = (dst: TextureMapping, textureId: number) => {
-            if (textureHolder.hasTexture('tex')) {
-                textureHolder.fillTextureMapping(dst, 'tex');
+        const fillTextureReference = (dst: TextureMapping, textureId: string) => {
+            if (textureHolder.hasTexture(textureId)) {
+                textureHolder.fillTextureMapping(dst, textureId);
             } else {
-                dst.gfxTexture = null
+                dst.gfxTexture = null;
             }
             dst.gfxSampler = gfxSampler;
         };
 
         if (meshFrag.textureIds.length >= 1) {
             this.program.setDefineBool('USE_TEXTURE', true);
-            fillTextureReference(this.textureMapping[0], meshFrag.textureIds[0]);
+            fillTextureReference(this.textureMapping[0], 'tex0');
+            fillTextureReference(this.textureMapping[1], 'tex1');
+            fillTextureReference(this.textureMapping[2], 'tex2');
         }
 
         let useAlphaTest: boolean;
@@ -539,7 +566,7 @@ function fillSceneParamsData(d: Float32Array, camera: Camera, offs: number = 0):
 }
 
 const bindingLayouts: GfxBindingLayoutDescriptor[] = [
-    { numUniformBuffers: 2, numSamplers: 1 },
+    { numUniformBuffers: 2, numSamplers: 3 },
 ];
 export class SceneRenderer {
     private mapData: MapData;

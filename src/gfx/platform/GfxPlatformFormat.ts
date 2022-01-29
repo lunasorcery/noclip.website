@@ -91,6 +91,7 @@ export enum GfxFormat {
     S16_R           = makeFormat(FormatTypeFlags.S16,       FormatCompFlags.R,                FormatFlags.None),
     S16_RG          = makeFormat(FormatTypeFlags.S16,       FormatCompFlags.RG,               FormatFlags.None),
     S16_RG_NORM     = makeFormat(FormatTypeFlags.S16,       FormatCompFlags.RG,               FormatFlags.Normalized),
+    S16_RGB         = makeFormat(FormatTypeFlags.S16,       FormatCompFlags.RGB,              FormatFlags.None),
     S16_RGB_NORM    = makeFormat(FormatTypeFlags.S16,       FormatCompFlags.RGB,              FormatFlags.Normalized),
     S16_RGBA        = makeFormat(FormatTypeFlags.S16,       FormatCompFlags.RGBA,             FormatFlags.None),
     S16_RGBA_NORM   = makeFormat(FormatTypeFlags.S16,       FormatCompFlags.RGBA,             FormatFlags.Normalized),
