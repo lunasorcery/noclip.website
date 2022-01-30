@@ -44,7 +44,7 @@ interface AsterixTriPoly {
     uvs: AsterixUv[],
 }
 
-interface AsterixTriModel {
+export interface AsterixTriModel {
     verts: AsterixVertex[],
     polys: AsterixTriPoly[],
 }
