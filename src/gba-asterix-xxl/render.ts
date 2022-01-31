@@ -257,42 +257,43 @@ class TriModelData {
             const i1 = poly.indices[1];
             const i2 = poly.indices[2];
 
-            //const doRender = (poly.flags & 0x1) != 0;
+            const doRender = (poly.flags & 0x1) != 0;
             const isTextured = (poly.flags & 0x2) != 0;
             const isColored = !isTextured;
-            //const texId = poly.flags >> 4;
             const color = isColored
                 ? decodeBGR555(palette[poly.uvs[0].u])
                 : 0;
 
-            const currVertBase = vertIdx / channelsPerVert;
-            indices[idxIdx++] = currVertBase + 0;
-            indices[idxIdx++] = currVertBase + 1;
-            indices[idxIdx++] = currVertBase + 2;
+            if (doRender) {
+                const currVertBase = vertIdx / channelsPerVert;
+                indices[idxIdx++] = currVertBase + 0;
+                indices[idxIdx++] = currVertBase + 1;
+                indices[idxIdx++] = currVertBase + 2;
 
-            verts[vertIdx++] = model.verts[i0].x;
-            verts[vertIdx++] = model.verts[i0].y;
-            verts[vertIdx++] = model.verts[i0].z;
-            colors[colIdx++] = color;
-            uvs[uvIdx++] = poly.uvs[0].u;
-            uvs[uvIdx++] = poly.uvs[0].v;
-            uvs[uvIdx++] = poly.flags;
+                verts[vertIdx++] = model.verts[i0].x;
+                verts[vertIdx++] = model.verts[i0].y;
+                verts[vertIdx++] = model.verts[i0].z;
+                colors[colIdx++] = color;
+                uvs[uvIdx++] = poly.uvs[0].u;
+                uvs[uvIdx++] = poly.uvs[0].v;
+                uvs[uvIdx++] = poly.flags;
 
-            verts[vertIdx++] = model.verts[i1].x;
-            verts[vertIdx++] = model.verts[i1].y;
-            verts[vertIdx++] = model.verts[i1].z;
-            colors[colIdx++] = color;
-            uvs[uvIdx++] = poly.uvs[1].u;
-            uvs[uvIdx++] = poly.uvs[1].v;
-            uvs[uvIdx++] = poly.flags;
+                verts[vertIdx++] = model.verts[i1].x;
+                verts[vertIdx++] = model.verts[i1].y;
+                verts[vertIdx++] = model.verts[i1].z;
+                colors[colIdx++] = color;
+                uvs[uvIdx++] = poly.uvs[1].u;
+                uvs[uvIdx++] = poly.uvs[1].v;
+                uvs[uvIdx++] = poly.flags;
 
-            verts[vertIdx++] = model.verts[i2].x;
-            verts[vertIdx++] = model.verts[i2].y;
-            verts[vertIdx++] = model.verts[i2].z;
-            colors[colIdx++] = color;
-            uvs[uvIdx++] = poly.uvs[2].u;
-            uvs[uvIdx++] = poly.uvs[2].v;
-            uvs[uvIdx++] = poly.flags;
+                verts[vertIdx++] = model.verts[i2].x;
+                verts[vertIdx++] = model.verts[i2].y;
+                verts[vertIdx++] = model.verts[i2].z;
+                colors[colIdx++] = color;
+                uvs[uvIdx++] = poly.uvs[2].u;
+                uvs[uvIdx++] = poly.uvs[2].v;
+                uvs[uvIdx++] = poly.flags;
+            }
         }
 
         this.buffers = new TriModelGfxBuffers(
@@ -542,64 +543,64 @@ class EnvironmentData {
                 const quadIdx = materialAttr.textureQuadIndex;
                 const quad = lvl.textureQuads[quadIdx];
 
-                //const doRender = (quad.flags & 0x1) != 0;
+                const doRender = (quad.flags & 0x1) != 0;
                 const isTextured = (quad.flags & 0x2) != 0;
                 const isColored = !isTextured;
 
-                //if (doRender) {
-                const color = isColored
-                    ? decodeBGR555(lvl.palette[quad.uvs[0].u])
-                    : 0;
+                if (doRender) {
+                    const color = isColored
+                        ? decodeBGR555(lvl.palette[quad.uvs[0].u])
+                        : 0;
 
-                const currQuadVertBase = vertIdx / channelsPerVert;
-                indices[idxIdx++] = currQuadVertBase + 0;
-                indices[idxIdx++] = currQuadVertBase + 2;
-                indices[idxIdx++] = currQuadVertBase + 1;
-                indices[idxIdx++] = currQuadVertBase + 1;
-                indices[idxIdx++] = currQuadVertBase + 2;
-                indices[idxIdx++] = currQuadVertBase + 3;
+                    const currQuadVertBase = vertIdx / channelsPerVert;
+                    indices[idxIdx++] = currQuadVertBase + 0;
+                    indices[idxIdx++] = currQuadVertBase + 2;
+                    indices[idxIdx++] = currQuadVertBase + 1;
+                    indices[idxIdx++] = currQuadVertBase + 1;
+                    indices[idxIdx++] = currQuadVertBase + 2;
+                    indices[idxIdx++] = currQuadVertBase + 3;
 
-                verts[vertIdx++] = lvl.vertexTable[s0 * 13 + x0].x;
-                verts[vertIdx++] = lvl.vertexTable[s0 * 13 + x0].y;
-                verts[vertIdx++] = lvl.vertexTable[s0 * 13 + x0].z;
-                colors[colIdx++] = color;
-                uvs[uvIdx++] = quad.uvs[3].u;
-                uvs[uvIdx++] = quad.uvs[3].v;
-                uvs[uvIdx++] = quad.flags;
+                    verts[vertIdx++] = lvl.vertexTable[s0 * 13 + x0].x;
+                    verts[vertIdx++] = lvl.vertexTable[s0 * 13 + x0].y;
+                    verts[vertIdx++] = lvl.vertexTable[s0 * 13 + x0].z;
+                    colors[colIdx++] = color;
+                    uvs[uvIdx++] = quad.uvs[3].u;
+                    uvs[uvIdx++] = quad.uvs[3].v;
+                    uvs[uvIdx++] = quad.flags;
 
-                verts[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].x;
-                verts[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].y;
-                verts[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].z;
-                colors[colIdx++] = color;
-                uvs[uvIdx++] = quad.uvs[2].u;
-                uvs[uvIdx++] = quad.uvs[2].v;
-                uvs[uvIdx++] = quad.flags;
+                    verts[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].x;
+                    verts[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].y;
+                    verts[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].z;
+                    colors[colIdx++] = color;
+                    uvs[uvIdx++] = quad.uvs[2].u;
+                    uvs[uvIdx++] = quad.uvs[2].v;
+                    uvs[uvIdx++] = quad.flags;
 
-                verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].x;
-                verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].y;
-                verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].z;
-                colors[colIdx++] = color;
-                uvs[uvIdx++] = quad.uvs[0].u;
-                uvs[uvIdx++] = quad.uvs[0].v;
-                uvs[uvIdx++] = quad.flags;
+                    verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].x;
+                    verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].y;
+                    verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].z;
+                    colors[colIdx++] = color;
+                    uvs[uvIdx++] = quad.uvs[0].u;
+                    uvs[uvIdx++] = quad.uvs[0].v;
+                    uvs[uvIdx++] = quad.flags;
 
-                verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].x;
-                verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].y;
-                verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].z;
-                colors[colIdx++] = color;
-                uvs[uvIdx++] = quad.uvs[1].u;
-                uvs[uvIdx++] = quad.uvs[1].v;
-                uvs[uvIdx++] = quad.flags;
-                //}
+                    verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].x;
+                    verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].y;
+                    verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].z;
+                    colors[colIdx++] = color;
+                    uvs[uvIdx++] = quad.uvs[1].u;
+                    uvs[uvIdx++] = quad.uvs[1].v;
+                    uvs[uvIdx++] = quad.flags;
+                }
             }
         }
+
         this.buffers = new EnvironmentGfxBuffers(
             device,
             new ArrayBufferSlice(verts.buffer),
             new ArrayBufferSlice(colors.buffer),
             new ArrayBufferSlice(uvs.buffer),
-            indices
-        );
+            indices);
     }
 
     public destroy(device: GfxDevice): void {
