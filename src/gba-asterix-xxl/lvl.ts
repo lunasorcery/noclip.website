@@ -57,20 +57,62 @@ interface AsterixXZBounds {
 }
 
 export interface AsterixObjSolidModel {
+    type: AsterixObjectType,
     unk1: number,
     model: AsterixTriModel,
     broad_bounds: AsterixXZBounds,
 }
 
 export interface AsterixObjIntangibleModel {
+    type: AsterixObjectType,
     unk1: number,
     model: AsterixTriModel,
 }
 
-interface AsterixObject {
+export interface AsterixObjTrampoline {
+    type: AsterixObjectType,
+    unk1: number,
+    model: AsterixTriModel,
+    broad_bounds: AsterixXZBounds,
+}
+
+export interface AsterixObjElevator {
+    type: AsterixObjectType,
+    state_flags: number;
+    dummy_model: AsterixTriModel;
+    broad_bounds: AsterixXZBounds;
+    min_elevation: number;
+    max_elevation: number;
+    paused: number;
+    unused: number;
+    render_model: AsterixTriModel;
+}
+
+interface AsterixCrateEmbeddedObject {
+    unk1: number,
+    angle: number,
+    object: AsterixObject | null,
+}
+export interface AsterixObjCrate {
+    type: AsterixObjectType,
+    unk1: number,
+    model: AsterixTriModel,
+    broad_bounds: AsterixXZBounds,
+    extra_xz_values: number[],
+    embedded_items: AsterixCrateEmbeddedObject[],
+}
+
+type AsterixObject =
+    | AsterixObjSolidModel
+    | AsterixObjIntangibleModel
+    | AsterixObjTrampoline
+    | AsterixObjElevator
+    | AsterixObjCrate;
+
+interface AsterixGenericObject {
     preamble_pos: AsterixVertex;
     preamble_unk: number;
-    payload: AsterixObjSolidModel | AsterixObjIntangibleModel | null;
+    payload: AsterixObject | null;
 }
 
 export interface AsterixLvl {
@@ -82,13 +124,55 @@ export interface AsterixLvl {
     collisionSpans0: AsterixCollisionSpan[];
     collisionSpans1: AsterixCollisionSpan[];
     objectOffsets: number[];
-    objects: AsterixObject[];
+    objects: AsterixGenericObject[];
 }
 
 export const enum Version {
     PrototypeA = 0,
     PrototypeB = 1,
     Retail = 2,
+}
+
+export const enum AsterixObjectType {
+    SolidModel = 0x00,
+    IntangibleModel = 0x01,
+    StaticBillboard = 0x02,
+    Pickup03 = 0x03,
+    Pickup04 = 0x04,
+    Pickup05 = 0x05,
+    Pickup06 = 0x06,
+    Pickup07 = 0x07,
+    Pickup08 = 0x08,
+    _09 = 0x09,
+    Trampoline = 0x0A,
+    Elevator = 0x0B,
+    Button = 0x0C,
+    _0D = 0x0D,
+    _0E = 0x0E,
+    _0F = 0x0F,
+    _10 = 0x10,
+    _11 = 0x11,
+    _12 = 0x12,
+    _13 = 0x13,
+    Crate = 0x14,
+    HintsNpc = 0x15,
+    _16 = 0x16,
+    _17 = 0x17,
+    _18 = 0x18,
+    LevelComplete = 0x19,
+    _1A = 0x1A,
+    _1B = 0x1B,
+    _1C = 0x1C,
+    _1D = 0x1D,
+    _1E = 0x1E,
+    _1F = 0x1F,
+    _20 = 0x20,
+    _21 = 0x21,
+    _22 = 0x22,
+    _23 = 0x23,
+    _24 = 0x24,
+    _25 = 0x25,
+    _26 = 0x26,
 }
 
 function readAsterixPalette(stream: DataStream): Uint16Array {
@@ -230,21 +314,105 @@ function readAsterixObjSolidModel(stream: DataStream): AsterixObjSolidModel {
     const model = readAsterixTriModel(stream);
     const broad_bounds = readAsterixXZBounds(stream);
 
-    return { unk1, model, broad_bounds };
+    return {
+        type: AsterixObjectType.SolidModel,
+        unk1,
+        model,
+        broad_bounds
+    };
 }
 
 function readAsterixObjIntangibleModel(stream: DataStream): AsterixObjIntangibleModel {
     const unk1 = stream.readUint8();
     const model = readAsterixTriModel(stream);
 
-    return { unk1, model };
+    return {
+        type: AsterixObjectType.IntangibleModel,
+        unk1,
+        model
+    };
 }
 
-function readAsterixObjectPayload(stream: DataStream): AsterixObjSolidModel | AsterixObjIntangibleModel | null {
+function readAsterixObjTrampoline(stream: DataStream): AsterixObjTrampoline {
+    const unk1 = stream.readUint8();
+    const model = readAsterixTriModel(stream);
+    const broad_bounds = readAsterixXZBounds(stream);
+
+    return {
+        type: AsterixObjectType.Trampoline,
+        unk1,
+        model,
+        broad_bounds
+    };
+}
+
+function readAsterixObjElevator(stream: DataStream): AsterixObjElevator {
+    const state_flags = stream.readUint8();
+    const dummy_model = readAsterixTriModel(stream);
+    const broad_bounds = readAsterixXZBounds(stream);
+    const min_elevation = stream.readInt16();
+    const max_elevation = stream.readInt16();
+    const paused = stream.readUint8();
+    const unused = stream.readUint8();
+    const render_model = readAsterixTriModel(stream);
+
+    console.log(dummy_model);
+    console.log(render_model);
+
+    return {
+        type: AsterixObjectType.Elevator,
+        state_flags,
+        dummy_model,
+        broad_bounds,
+        min_elevation,
+        max_elevation,
+        paused,
+        unused,
+        render_model
+    };
+}
+
+function readAsterixObjCrate(stream: DataStream): AsterixObjCrate {
+    const unk1 = stream.readUint8();
+    const model = readAsterixTriModel(stream);
+    const broad_bounds = readAsterixXZBounds(stream);
+    const extra_xz_values = [
+        stream.readInt16(),
+        stream.readInt16(),
+        stream.readInt16(),
+        stream.readInt16(),
+        stream.readInt16(),
+        stream.readInt16(),
+        stream.readInt16(),
+        stream.readInt16(),
+    ];
+    const num_embedded_items = stream.readUint16();
+    let embedded_items: AsterixCrateEmbeddedObject[] = [];
+    // disabled until I write in parsing for types 3-8
+    /*for (let i = 0; i < num_embedded_items; ++i) {
+        const unk1 = stream.readUint8();
+        const angle = stream.readUint8();
+        const object = readAsterixObjectPayload(stream);
+        embedded_items.push({ unk1, angle, object});
+    }*/
+
+    return {
+        type:AsterixObjectType.Crate,
+        unk1,
+        model,
+        broad_bounds,
+        extra_xz_values,
+        embedded_items
+    };
+}
+
+function readAsterixObjectPayload(stream: DataStream): AsterixObject | null {
     const obj_type = stream.readUint8();
     switch (obj_type) {
-        case 0x00: return readAsterixObjSolidModel(stream);
-        case 0x01: return readAsterixObjIntangibleModel(stream);
+        case AsterixObjectType.SolidModel:
+            return readAsterixObjSolidModel(stream);
+        case AsterixObjectType.IntangibleModel:
+            return readAsterixObjIntangibleModel(stream);
         //case 0x02: StaticBillboard
         //case 0x03: Pickup03
         //case 0x04: Pickup04
@@ -253,8 +421,10 @@ function readAsterixObjectPayload(stream: DataStream): AsterixObjSolidModel | As
         //case 0x07: Pickup07
         //case 0x08: Pickup08
         //case 0x09: _09,
-        //case 0x0A: BouncePad
-        //case 0x0B: Elevator
+        case AsterixObjectType.Trampoline:
+            return readAsterixObjTrampoline(stream);
+        case AsterixObjectType.Elevator:
+            return readAsterixObjElevator(stream);
         //case 0x0C: Button
         //case 0x0D: _0D,
         //case 0x0E: _0E,
@@ -263,7 +433,8 @@ function readAsterixObjectPayload(stream: DataStream): AsterixObjSolidModel | As
         //case 0x11: _11,
         //case 0x12: _12,
         //case 0x13: _13,
-        //case 0x14: Crate
+        case AsterixObjectType.Crate:
+            return readAsterixObjCrate(stream);
         //case 0x15: HintsNpc
         //case 0x16: _16,
         //case 0x17: _17,
@@ -286,8 +457,8 @@ function readAsterixObjectPayload(stream: DataStream): AsterixObjSolidModel | As
     return null;
 }
 
-function readAsterixObjects(stream: DataStream, offsets: number[]): AsterixObject[] {
-    let objects: AsterixObject[] = [];
+function readAsterixGenericObjects(stream: DataStream, offsets: number[]): AsterixGenericObject[] {
+    let objects: AsterixGenericObject[] = [];
     let base_addr = stream.offs;
     for (let i = 0; i < offsets.length; ++i) {
         let curr_offset = offsets[i];
@@ -297,7 +468,7 @@ function readAsterixObjects(stream: DataStream, offsets: number[]): AsterixObjec
             let preamble_unk = stream.readInt16();
             let next_offset = stream.readInt16();
             let payload = readAsterixObjectPayload(stream);
-            let object: AsterixObject = { preamble_pos, preamble_unk, payload };
+            let object: AsterixGenericObject = { preamble_pos, preamble_unk, payload };
             objects.push(object);
             curr_offset = next_offset;
         }
@@ -316,7 +487,7 @@ export function parse(buffer: ArrayBufferSlice, version: Version): AsterixLvl {
     const collisionSpans0 = readAsterixCollisionSpanTable(stream, lvlHeader);
     const collisionSpans1 = readAsterixCollisionSpanTable(stream, lvlHeader);
     const objectOffsets = readAsterixObjectOffsets(stream, lvlHeader);
-    const objects = readAsterixObjects(stream, objectOffsets);
+    const objects = readAsterixGenericObjects(stream, objectOffsets);
 
     return { palette, textureQuads, lvlHeader, vertexTable, materialAttrs, collisionSpans0, collisionSpans1, objectOffsets, objects };
 }

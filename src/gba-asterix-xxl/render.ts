@@ -1,6 +1,6 @@
 
 import { TextureHolder, LoadedTexture, TextureMapping } from "../TextureHolder";
-import { AsterixLvl, AsterixObjIntangibleModel, AsterixObjSolidModel, AsterixTriModel } from "./lvl";
+import { AsterixLvl, AsterixTriModel, AsterixObjectType,AsterixObjSolidModel, AsterixObjIntangibleModel, AsterixObjTrampoline, AsterixObjElevator, AsterixObjCrate } from "./lvl";
 import { GfxDevice, GfxFormat, GfxBufferUsage, GfxBuffer, GfxVertexAttributeDescriptor, GfxVertexBufferFrequency, GfxInputLayout, GfxInputState, GfxVertexBufferDescriptor, GfxBufferFrequencyHint, GfxBindingLayoutDescriptor, GfxProgram, GfxSampler, GfxTexFilterMode, GfxMipFilterMode, GfxWrapMode, GfxTextureDimension, GfxRenderPass, GfxIndexBufferDescriptor, GfxInputLayoutBufferDescriptor, makeTextureDescriptor2D, GfxMegaStateDescriptor, GfxBlendMode, GfxBlendFactor, GfxCullMode, GfxFrontFaceMode } from "../gfx/platform/GfxPlatform";
 import * as Viewer from "../viewer";
 import { DecodedSurfaceSW, surfaceToCanvas } from "../Common/bc_texture";
@@ -200,8 +200,8 @@ class TriModelGfxBuffers {
         this.indexCount = idxData.length;
 
         const vertexAttributeDescriptors: GfxVertexAttributeDescriptor[] = [
-            { location: AsterixTriModelProgram.a_Position,  bufferIndex: 0, bufferByteOffset: 0, format: GfxFormat.S16_RGB },
-            { location: AsterixTriModelProgram.a_Color,     bufferIndex: 1, bufferByteOffset: 0, format: GfxFormat.U8_RGBA_NORM },
+            { location: AsterixTriModelProgram.a_Position, bufferIndex: 0, bufferByteOffset: 0, format: GfxFormat.S16_RGB },
+            { location: AsterixTriModelProgram.a_Color, bufferIndex: 1, bufferByteOffset: 0, format: GfxFormat.U8_RGBA_NORM },
             { location: AsterixTriModelProgram.a_TexCoord0, bufferIndex: 2, bufferByteOffset: 0, format: GfxFormat.U8_RGB },
         ];
         const vertexBufferDescriptors: (GfxInputLayoutBufferDescriptor | null)[] = [
@@ -216,9 +216,9 @@ class TriModelGfxBuffers {
             indexBufferFormat: GfxFormat.U16_R,
         });
         const buffers: (GfxVertexBufferDescriptor | null)[] = [
-            { buffer: this.vertBuffer,  byteOffset: 0 },
+            { buffer: this.vertBuffer, byteOffset: 0 },
             { buffer: this.colorBuffer, byteOffset: 0 },
-            { buffer: this.uvBuffer,    byteOffset: 0 },
+            { buffer: this.uvBuffer, byteOffset: 0 },
         ];
         const idxBuffer: GfxIndexBufferDescriptor = { buffer: this.idxBuffer, byteOffset: 0 };
         this.inputState = device.createInputState(this.inputLayout, buffers, idxBuffer);
@@ -841,20 +841,43 @@ class TriModelsRenderer {
 
     constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, lvl: AsterixLvl) {
         for (let i = 0; i < lvl.objects.length; ++i) {
-            const objSolidModel = lvl.objects[i].payload as AsterixObjSolidModel;
-            const objIntangibleModel = lvl.objects[i].payload as AsterixObjIntangibleModel;
-
-            if (objSolidModel !== null) {
-                const triModelData = new TriModelData(cache.device, objSolidModel.model, lvl.palette);
-                const triModelInstance = new TriModelInstance(cache, textureHolder, triModelData);
-                this.triModelInstances.push(triModelInstance);
-            }
-            if (objIntangibleModel !== null) {
-                const triModelData = new TriModelData(cache.device, objIntangibleModel.model, lvl.palette);
-                const triModelInstance = new TriModelInstance(cache, textureHolder, triModelData);
-                this.triModelInstances.push(triModelInstance);
+            const payload = lvl.objects[i].payload;
+            if (payload !== null) {
+                switch (payload.type) {
+                    case AsterixObjectType.SolidModel: {
+                        const objSolidModel = payload as AsterixObjSolidModel;
+                        this.addModelInstance(cache, textureHolder, objSolidModel.model, lvl.palette);
+                        break;
+                    }
+                    case AsterixObjectType.IntangibleModel: {
+                        const objIntangibleModel = payload as AsterixObjIntangibleModel;
+                        this.addModelInstance(cache, textureHolder, objIntangibleModel.model, lvl.palette);
+                        break;
+                    }
+                    case AsterixObjectType.Trampoline: {
+                        const objTrampoline = payload as AsterixObjTrampoline;
+                        this.addModelInstance(cache, textureHolder, objTrampoline.model, lvl.palette);
+                        break;
+                    }
+                    case AsterixObjectType.Elevator: {
+                        const objElevator = payload as AsterixObjElevator;
+                        this.addModelInstance(cache, textureHolder, objElevator.render_model, lvl.palette);
+                        break;
+                    }
+                    case AsterixObjectType.Crate: {
+                        const objCrate = payload as AsterixObjCrate;
+                        this.addModelInstance(cache, textureHolder, objCrate.model, lvl.palette);
+                        break;
+                    }
+                }
             }
         }
+    }
+
+    private addModelInstance(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, model: AsterixTriModel, palette: Uint16Array) {
+        const triModelData = new TriModelData(cache.device, model, palette);
+        const triModelInstance = new TriModelInstance(cache, textureHolder, triModelData);
+        this.triModelInstances.push(triModelInstance);
     }
 
     public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput): void {
