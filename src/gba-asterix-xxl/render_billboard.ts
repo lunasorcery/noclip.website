@@ -124,46 +124,12 @@ class BillboardData {
 	public position: vec3;
 	public size: vec3;
 	public texCoords: vec4;
-	public buffers: BillboardGfxBuffers;
 
 	constructor(device: GfxDevice, billboard: AsterixCommonBillboard) {
 		this.texId = billboard.tex_id;
 		this.position = vec3.fromValues(billboard.pos.x, billboard.pos.y, billboard.pos.z);
 		this.size = vec3.fromValues(billboard.width, billboard.height, 0);
 		this.texCoords = vec4.fromValues(billboard.left, billboard.top, billboard.right, billboard.bottom);
-
-		let verts = new Float32Array(8);
-		let vertIdx = 0;
-		verts[vertIdx++] = -.5; verts[vertIdx++] = 1;
-		verts[vertIdx++] = .5; verts[vertIdx++] = 1;
-		verts[vertIdx++] = -.5; verts[vertIdx++] = 0;
-		verts[vertIdx++] = .5; verts[vertIdx++] = 0;
-
-		let uvs = new Uint8Array(8);
-		let uvIdx = 0;
-		uvs[uvIdx++] = 0; uvs[uvIdx++] = 0;
-		uvs[uvIdx++] = 1; uvs[uvIdx++] = 0;
-		uvs[uvIdx++] = 0; uvs[uvIdx++] = 1;
-		uvs[uvIdx++] = 1; uvs[uvIdx++] = 1;
-
-		let indices = new Uint16Array(6);
-		let idxIdx = 0;
-		indices[idxIdx++] = 0;
-		indices[idxIdx++] = 1;
-		indices[idxIdx++] = 2;
-		indices[idxIdx++] = 2;
-		indices[idxIdx++] = 1;
-		indices[idxIdx++] = 3;
-
-		this.buffers = new BillboardGfxBuffers(
-			device,
-			new ArrayBufferSlice(verts.buffer),
-			new ArrayBufferSlice(uvs.buffer),
-			indices);
-	}
-
-	public destroy(device: GfxDevice): void {
-		this.buffers.destroy(device);
 	}
 }
 
@@ -221,12 +187,10 @@ class BillboardInstance {
 		return matOutput;
 	}
 
-	public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput) {
-		const billboardBuffers = this.billboardData.buffers;
-
+	public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput, gfxBuffers: BillboardGfxBuffers) {
 		const renderInst = renderInstManager.newRenderInst();
-		renderInst.setInputLayoutAndState(billboardBuffers.inputLayout, billboardBuffers.inputState);
-		renderInst.drawIndexes(billboardBuffers.indexCount);
+		renderInst.setInputLayoutAndState(gfxBuffers.inputLayout, gfxBuffers.inputState);
+		renderInst.drawIndexes(gfxBuffers.indexCount);
 
 		if (this.gfxProgram === null)
 			this.gfxProgram = renderInstManager.gfxRenderCache.createProgram(this.program);
@@ -270,9 +234,12 @@ export class BillboardsRenderer {
 		{ numUniformBuffers: 2, numSamplers: 1 },
 	];
 
+	public gfxBuffers: BillboardGfxBuffers;
 	private billboardInstances: BillboardInstance[] = [];
 
 	constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, lvl: AsterixLvl) {
+		this.buildGfxBuffers(cache.device);
+
 		for (let i = 0; i < lvl.objects.length; ++i) {
 			const payload = lvl.objects[i].payload;
 			if (payload !== null) {
@@ -285,6 +252,37 @@ export class BillboardsRenderer {
 				}
 			}
 		}
+	}
+
+	private buildGfxBuffers(device: GfxDevice) {
+		let verts = new Float32Array(8);
+		let vertIdx = 0;
+		verts[vertIdx++] = -.5; verts[vertIdx++] = 1;
+		verts[vertIdx++] = .5; verts[vertIdx++] = 1;
+		verts[vertIdx++] = -.5; verts[vertIdx++] = 0;
+		verts[vertIdx++] = .5; verts[vertIdx++] = 0;
+
+		let uvs = new Uint8Array(8);
+		let uvIdx = 0;
+		uvs[uvIdx++] = 0; uvs[uvIdx++] = 0;
+		uvs[uvIdx++] = 1; uvs[uvIdx++] = 0;
+		uvs[uvIdx++] = 0; uvs[uvIdx++] = 1;
+		uvs[uvIdx++] = 1; uvs[uvIdx++] = 1;
+
+		let indices = new Uint16Array(6);
+		let idxIdx = 0;
+		indices[idxIdx++] = 0;
+		indices[idxIdx++] = 1;
+		indices[idxIdx++] = 2;
+		indices[idxIdx++] = 2;
+		indices[idxIdx++] = 1;
+		indices[idxIdx++] = 3;
+
+		this.gfxBuffers = new BillboardGfxBuffers(
+			device,
+			new ArrayBufferSlice(verts.buffer),
+			new ArrayBufferSlice(uvs.buffer),
+			indices);
 	}
 
 	private addBillboard(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, billboard: AsterixCommonBillboard) {
@@ -302,12 +300,13 @@ export class BillboardsRenderer {
 		offs += fillMatrix4x4(sceneParamsMapped, offs, viewerInput.camera.projectionMatrix);
 
 		for (let i = 0; i < this.billboardInstances.length; ++i) {
-			this.billboardInstances[i].prepareToRender(device, renderInstManager, viewerInput);
+			this.billboardInstances[i].prepareToRender(device, renderInstManager, viewerInput, this.gfxBuffers);
 		}
 		renderInstManager.popTemplateRenderInst();
 	}
 
 	public destroy(device: GfxDevice): void {
+		this.gfxBuffers.destroy(device);
 		for (let i = 0; i < this.billboardInstances.length; ++i) {
 			this.billboardInstances[i].destroy(device);
 		}
