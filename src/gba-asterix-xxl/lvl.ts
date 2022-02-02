@@ -56,6 +56,17 @@ interface AsterixXZBounds {
     z_max: number,
 }
 
+export interface AsterixCommonBillboard {
+	tex_id: number,
+	pos: AsterixVertex,
+	width: number,
+	height: number,
+	left: number,
+	top: number,
+	right: number,
+	bottom: number,
+}
+
 export interface AsterixObjSolidModel {
     type: AsterixObjectType,
     unk1: number,
@@ -67,6 +78,11 @@ export interface AsterixObjIntangibleModel {
     type: AsterixObjectType,
     unk1: number,
     model: AsterixTriModel,
+}
+
+export interface AsterixObjStaticBillboard {
+    type: AsterixObjectType,
+    billboard: AsterixCommonBillboard,
 }
 
 export interface AsterixObjTrampoline {
@@ -105,6 +121,7 @@ export interface AsterixObjCrate {
 type AsterixObject =
     | AsterixObjSolidModel
     | AsterixObjIntangibleModel
+    | AsterixObjStaticBillboard
     | AsterixObjTrampoline
     | AsterixObjElevator
     | AsterixObjCrate;
@@ -309,6 +326,19 @@ function readAsterixXZBounds(stream: DataStream): AsterixXZBounds {
     return { x_min, x_max, z_min, z_max };
 }
 
+function readAsterixCommonBillboard(stream: DataStream): AsterixCommonBillboard {
+    const tex_id = stream.readUint8();
+    const pos = readAsterixVertex(stream);
+    const width = stream.readInt16();
+    const height = stream.readInt16();
+    const left = stream.readUint8();
+    const top = stream.readUint8();
+    const right = stream.readUint8();
+    const bottom = stream.readUint8();
+
+    return { tex_id, pos, width, height, left, top, right, bottom };
+}
+
 function readAsterixObjSolidModel(stream: DataStream): AsterixObjSolidModel {
     const unk1 = stream.readUint8();
     const model = readAsterixTriModel(stream);
@@ -330,6 +360,15 @@ function readAsterixObjIntangibleModel(stream: DataStream): AsterixObjIntangible
         type: AsterixObjectType.IntangibleModel,
         unk1,
         model
+    };
+}
+
+function readAsterixObjStaticBillboard(stream: DataStream): AsterixObjStaticBillboard {
+    const billboard = readAsterixCommonBillboard(stream);
+
+    return { 
+        type: AsterixObjectType.StaticBillboard,
+        billboard
     };
 }
 
@@ -413,7 +452,8 @@ function readAsterixObjectPayload(stream: DataStream): AsterixObject | null {
             return readAsterixObjSolidModel(stream);
         case AsterixObjectType.IntangibleModel:
             return readAsterixObjIntangibleModel(stream);
-        //case 0x02: StaticBillboard
+        case AsterixObjectType.StaticBillboard:
+            return readAsterixObjStaticBillboard(stream);
         //case 0x03: Pickup03
         //case 0x04: Pickup04
         //case 0x05: Pickup05

@@ -1,13 +1,13 @@
 
 import { TextureHolder, LoadedTexture, TextureMapping } from "../TextureHolder";
-import { AsterixLvl, AsterixTriModel, AsterixObjectType, AsterixObjSolidModel, AsterixObjIntangibleModel, AsterixObjTrampoline, AsterixObjElevator, AsterixObjCrate } from "./lvl";
+import { AsterixLvl, AsterixCommonBillboard, AsterixTriModel, AsterixObjectType, AsterixObjSolidModel, AsterixObjIntangibleModel, AsterixObjStaticBillboard, AsterixObjTrampoline, AsterixObjElevator, AsterixObjCrate } from "./lvl";
 import { GfxDevice, GfxFormat, GfxBufferUsage, GfxBuffer, GfxVertexAttributeDescriptor, GfxVertexBufferFrequency, GfxInputLayout, GfxInputState, GfxVertexBufferDescriptor, GfxBufferFrequencyHint, GfxBindingLayoutDescriptor, GfxProgram, GfxSampler, GfxTexFilterMode, GfxMipFilterMode, GfxWrapMode, GfxTextureDimension, GfxRenderPass, GfxIndexBufferDescriptor, GfxInputLayoutBufferDescriptor, makeTextureDescriptor2D, GfxMegaStateDescriptor, GfxBlendMode, GfxBlendFactor, GfxCullMode, GfxFrontFaceMode } from "../gfx/platform/GfxPlatform";
 import * as Viewer from "../viewer";
 import { DecodedSurfaceSW, surfaceToCanvas } from "../Common/bc_texture";
 import { makeStaticDataBuffer, makeStaticDataBufferFromSlice } from "../gfx/helpers/BufferHelpers";
 import { DeviceProgram } from "../Program";
 import { filterDegenerateTriangleIndexBuffer } from "../gfx/helpers/TopologyHelpers";
-import { fillMatrix4x3, fillMatrix4x4, fillVec4, fillVec4v } from "../gfx/helpers/UniformBufferHelpers";
+import { fillMatrix4x3, fillMatrix4x4, fillVec3v, fillVec4v } from "../gfx/helpers/UniformBufferHelpers";
 import { mat4, ReadonlyMat4, vec2, vec3, vec4 } from "gl-matrix";
 import { Camera, computeViewSpaceDepthFromWorldSpaceAABB } from "../Camera";
 import ArrayBufferSlice from "../ArrayBufferSlice";
@@ -361,7 +361,7 @@ class TriModelInstance {
         //const depth = computeViewSpaceDepthFromWorldSpaceAABB(viewerInput.camera.viewMatrix, scratchAABB);
         //renderInst.sortKey = setSortKeyDepth(renderInst.sortKey, depth);
 
-        let offs = renderInst.allocateUniformBuffer(TriModelProgram.ub_MeshFragParams, 20);
+        let offs = renderInst.allocateUniformBuffer(TriModelProgram.ub_MeshFragParams, 12);
         const d = renderInst.mapUniformBufferF32(TriModelProgram.ub_MeshFragParams);
         mat4.mul(scratchMat4, viewerInput.camera.viewMatrix, modelMatrix);
         offs += fillMatrix4x3(d, offs, scratchMat4);
@@ -664,12 +664,257 @@ class EnvironmentInstance {
         //const depth = computeViewSpaceDepthFromWorldSpaceAABB(viewerInput.camera.viewMatrix, scratchAABB);
         //renderInst.sortKey = setSortKeyDepth(renderInst.sortKey, depth);
 
-        let offs = renderInst.allocateUniformBuffer(EnvironmentProgram.ub_MeshFragParams, 20);
+        let offs = renderInst.allocateUniformBuffer(EnvironmentProgram.ub_MeshFragParams, 12);
         const d = renderInst.mapUniformBufferF32(EnvironmentProgram.ub_MeshFragParams);
         mat4.mul(scratchMat4, viewerInput.camera.viewMatrix, modelMatrix);
         offs += fillMatrix4x3(d, offs, scratchMat4);
 
         //offs += fillVec4v(d, offs, meshFrag.materialColor);
+
+        //const time = viewerInput.time / 4000;
+        //const texCoordTransVel = meshFrag.texCoordTransVel;
+        //const texCoordTransX = texCoordTransVel[0] * time;
+        //const texCoordTransY = texCoordTransVel[1] * time;
+        //offs += fillVec4(d, offs, texCoordTransX, texCoordTransY);
+
+        renderInstManager.submitRenderInst(renderInst);
+    }
+
+    public destroy(device: GfxDevice): void {
+    }
+}
+
+
+class BillboardProgram extends DeviceProgram {
+    public static a_Position = 0;
+    public static a_TexCoord0 = 1;
+
+    public static ub_SceneParams = 0;
+    public static ub_MeshFragParams = 1;
+
+    public both = `
+precision mediump float;
+
+// Expected to be constant across the entire scene.
+layout(std140) uniform ub_SceneParams {
+    Mat4x4 u_Projection;
+};
+
+layout(std140) uniform ub_MeshFragParams {
+    Mat4x3 u_ModelView;
+    vec4 u_TexCoords; // { left, top, right, bottom }
+    vec4 u_Size; // { width, height, _, _ }
+};
+
+uniform sampler2D u_Tex;
+
+varying vec2 v_TexCoord;
+
+#ifdef VERT
+layout(location = ${BillboardProgram.a_Position})  in vec2 a_Position;
+layout(location = ${BillboardProgram.a_TexCoord0}) in vec2 a_TexCoord;
+
+void main() {
+    vec3 localPos = vec3(a_Position * u_Size.xy, 0);
+    gl_Position = Mul(u_Projection, Mul(_Mat4x4(u_ModelView), vec4(localPos, 1.0)));
+    v_TexCoord = mix(u_TexCoords.xy, u_TexCoords.zw, a_TexCoord);
+}
+#endif
+
+#ifdef FRAG
+void main() {
+    vec4 t_Color = vec4(1.0);
+
+    vec2 texCoord = v_TexCoord / 256.;
+    t_Color = texture(SAMPLER_2D(u_Tex), texCoord);
+
+    if (t_Color.a == 0.0)
+        discard;
+
+    gl_FragColor = t_Color;
+}
+#endif
+`;
+}
+
+class BillboardGfxBuffers {
+    private vertBuffer: GfxBuffer;
+    private uvBuffer: GfxBuffer;
+    private idxBuffer: GfxBuffer;
+    public inputLayout: GfxInputLayout;
+    public inputState: GfxInputState;
+    public indexCount: number;
+
+    constructor(
+        device: GfxDevice,
+        public verts: ArrayBufferSlice,
+        public uvs: ArrayBufferSlice,
+        public indices: Uint16Array) {
+        this.vertBuffer = makeStaticDataBufferFromSlice(device, GfxBufferUsage.Vertex, verts);
+        this.uvBuffer = makeStaticDataBufferFromSlice(device, GfxBufferUsage.Vertex, uvs);
+
+        const idxData = filterDegenerateTriangleIndexBuffer(indices);
+        this.idxBuffer = makeStaticDataBuffer(device, GfxBufferUsage.Index, idxData.buffer);
+        this.indexCount = idxData.length;
+
+        const vertexAttributeDescriptors: GfxVertexAttributeDescriptor[] = [
+            { location: BillboardProgram.a_Position, bufferIndex: 0, bufferByteOffset: 0, format: GfxFormat.F32_RG },
+            { location: BillboardProgram.a_TexCoord0, bufferIndex: 1, bufferByteOffset: 0, format: GfxFormat.U8_RG },
+        ];
+        const vertexBufferDescriptors: (GfxInputLayoutBufferDescriptor | null)[] = [
+            { byteStride: 0x08, frequency: GfxVertexBufferFrequency.PerVertex },
+            { byteStride: 0x02, frequency: GfxVertexBufferFrequency.PerVertex },
+        ];
+
+        this.inputLayout = device.createInputLayout({
+            vertexAttributeDescriptors,
+            vertexBufferDescriptors,
+            indexBufferFormat: GfxFormat.U16_R,
+        });
+        const buffers: (GfxVertexBufferDescriptor | null)[] = [
+            { buffer: this.vertBuffer, byteOffset: 0 },
+            { buffer: this.uvBuffer, byteOffset: 0 },
+        ];
+        const idxBuffer: GfxIndexBufferDescriptor = { buffer: this.idxBuffer, byteOffset: 0 };
+        this.inputState = device.createInputState(this.inputLayout, buffers, idxBuffer);
+    }
+
+    public destroy(device: GfxDevice): void {
+        device.destroyBuffer(this.vertBuffer);
+        device.destroyBuffer(this.uvBuffer);
+        device.destroyBuffer(this.idxBuffer);
+        device.destroyInputLayout(this.inputLayout);
+        device.destroyInputState(this.inputState);
+    }
+}
+
+class BillboardData {
+    public texId: number;
+    public position: vec3;
+    public size: vec3;
+    public texCoords: vec4;
+    public buffers: BillboardGfxBuffers;
+
+    constructor(device: GfxDevice, billboard: AsterixCommonBillboard) {
+        this.texId = billboard.tex_id;
+        this.position = vec3.fromValues(billboard.pos.x, billboard.pos.y, billboard.pos.z);
+        this.size = vec3.fromValues(billboard.width, billboard.height, 0);
+        this.texCoords = vec4.fromValues(billboard.left, billboard.top, billboard.right, billboard.bottom);
+
+        let verts = new Float32Array(8);
+        let vertIdx = 0;
+        verts[vertIdx++] = -.5; verts[vertIdx++] = 1;
+        verts[vertIdx++] = .5; verts[vertIdx++] = 1;
+        verts[vertIdx++] = -.5; verts[vertIdx++] = 0;
+        verts[vertIdx++] = .5; verts[vertIdx++] = 0;
+
+        let uvs = new Uint8Array(8);
+        let uvIdx = 0;
+        uvs[uvIdx++] = 0; uvs[uvIdx++] = 0;
+        uvs[uvIdx++] = 1; uvs[uvIdx++] = 0;
+        uvs[uvIdx++] = 0; uvs[uvIdx++] = 1;
+        uvs[uvIdx++] = 1; uvs[uvIdx++] = 1;
+
+        let indices = new Uint16Array(6);
+        let idxIdx = 0;
+        indices[idxIdx++] = 0;
+        indices[idxIdx++] = 1;
+        indices[idxIdx++] = 2;
+        indices[idxIdx++] = 2;
+        indices[idxIdx++] = 1;
+        indices[idxIdx++] = 3;
+
+        this.buffers = new BillboardGfxBuffers(
+            device,
+            new ArrayBufferSlice(verts.buffer),
+            new ArrayBufferSlice(uvs.buffer),
+            indices);
+    }
+
+    public destroy(device: GfxDevice): void {
+        this.buffers.destroy(device);
+    }
+}
+
+class BillboardInstance {
+    private gfxProgram: GfxProgram | null = null;
+    private program: BillboardProgram;
+    private textureMapping = nArray(1, () => new TextureMapping());
+    private megaState: Partial<GfxMegaStateDescriptor> = {};
+    private sortKey: number = 0;
+
+    constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, public billboardData: BillboardData) {
+        console.log(this.billboardData);
+
+        this.program = new BillboardProgram();
+
+        const gfxSampler = cache.createSampler({
+            magFilter: GfxTexFilterMode.Point,
+            minFilter: GfxTexFilterMode.Point,
+            mipFilter: GfxMipFilterMode.NoMip,
+            wrapS: GfxWrapMode.Repeat,
+            wrapT: GfxWrapMode.Repeat,
+        });
+
+        const fillTextureReference = (dst: TextureMapping, textureId: string) => {
+            if (textureHolder.hasTexture(textureId)) {
+                textureHolder.fillTextureMapping(dst, textureId);
+            } else {
+                dst.gfxTexture = null;
+            }
+            dst.gfxSampler = gfxSampler;
+        };
+
+        const textureNames = ['tex0', 'tex1', 'tex2', 'common3', 'common4', 'common5', 'common6'];
+        fillTextureReference(this.textureMapping[0], textureNames[billboardData.texId]);
+
+        this.sortKey = makeSortKey(GfxRendererLayer.OPAQUE);
+
+        this.megaState.frontFace = GfxFrontFaceMode.CW;
+        this.megaState.cullMode = GfxCullMode.Back;
+    }
+
+    public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput) {
+        const billboardBuffers = this.billboardData.buffers;
+
+        const renderInst = renderInstManager.newRenderInst();
+        renderInst.setInputLayoutAndState(billboardBuffers.inputLayout, billboardBuffers.inputState);
+        renderInst.drawIndexes(billboardBuffers.indexCount);
+
+        if (this.gfxProgram === null)
+            this.gfxProgram = renderInstManager.gfxRenderCache.createProgram(this.program);
+
+        renderInst.setGfxProgram(this.gfxProgram);
+        renderInst.setSamplerBindingsFromTextureMappings(this.textureMapping);
+        renderInst.setMegaStateFlags(this.megaState);
+
+        renderInst.sortKey = this.sortKey;
+        //scratchAABB.transform(meshFrag.bbox, modelMatrix);
+        //const depth = computeViewSpaceDepthFromWorldSpaceAABB(viewerInput.camera.viewMatrix, scratchAABB);
+        //renderInst.sortKey = setSortKeyDepth(renderInst.sortKey, depth);
+
+        let offs = renderInst.allocateUniformBuffer(BillboardProgram.ub_MeshFragParams, 20);
+        const d = renderInst.mapUniformBufferF32(BillboardProgram.ub_MeshFragParams);
+
+        let matLocal = mat4.create();
+        mat4.fromTranslation(matLocal, this.billboardData.position);
+
+        let matModelView = mat4.create();
+        mat4.mul(matModelView, viewerInput.camera.viewMatrix, matLocal);
+
+        let vecModelViewTranslation = vec3.create();
+        mat4.getTranslation(vecModelViewTranslation, matModelView);
+
+        mat4.fromTranslation(scratchMat4, vecModelViewTranslation);
+
+        offs += fillMatrix4x3(d, offs, scratchMat4);
+
+
+        // tex coords
+        offs += fillVec4v(d, offs, this.billboardData.texCoords);
+
+        // size
+        offs += fillVec3v(d, offs, this.billboardData.size);
 
         //const time = viewerInput.time / 4000;
         //const texCoordTransVel = meshFrag.texCoordTransVel;
@@ -790,23 +1035,76 @@ class EnvironmentRenderer {
     }
 }
 
+class BillboardsRenderer {
+    private static readonly bindingLayouts: GfxBindingLayoutDescriptor[] = [
+        { numUniformBuffers: 2, numSamplers: 1 },
+    ];
+
+    private billboardInstances: BillboardInstance[] = [];
+
+    constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, lvl: AsterixLvl) {
+        for (let i = 0; i < lvl.objects.length; ++i) {
+            const payload = lvl.objects[i].payload;
+            if (payload !== null) {
+                switch (payload.type) {
+                    case AsterixObjectType.StaticBillboard: {
+                        const objStaticBillboard = payload as AsterixObjStaticBillboard;
+                        this.addBillboard(cache, textureHolder, objStaticBillboard.billboard);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    private addBillboard(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, billboard: AsterixCommonBillboard) {
+        const billboardData = new BillboardData(cache.device, billboard);
+        const billboardInstance = new BillboardInstance(cache, textureHolder, billboardData);
+        this.billboardInstances.push(billboardInstance);
+    }
+
+    public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput): void {
+        const template = renderInstManager.pushTemplateRenderInst();
+        template.setBindingLayouts(BillboardsRenderer.bindingLayouts);
+
+        let offs = template.allocateUniformBuffer(BillboardProgram.ub_SceneParams, 16);
+        const sceneParamsMapped = template.mapUniformBufferF32(BillboardProgram.ub_SceneParams);
+        fillSceneParamsData(sceneParamsMapped, viewerInput.camera, offs);
+
+        for (let i = 0; i < this.billboardInstances.length; ++i) {
+            this.billboardInstances[i].prepareToRender(device, renderInstManager, viewerInput);
+        }
+        renderInstManager.popTemplateRenderInst();
+    }
+
+    public destroy(device: GfxDevice): void {
+        for (let i = 0; i < this.billboardInstances.length; ++i) {
+            this.billboardInstances[i].destroy(device);
+        }
+    }
+}
+
 export class SceneRenderer {
     private environmentRenderer: EnvironmentRenderer;
     private triModelsRenderer: TriModelsRenderer;
+    private billboardsRenderer: BillboardsRenderer;
 
     constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, lvl: AsterixLvl) {
         this.environmentRenderer = new EnvironmentRenderer(cache, textureHolder, lvl);
         this.triModelsRenderer = new TriModelsRenderer(cache, textureHolder, lvl);
+        this.billboardsRenderer = new BillboardsRenderer(cache, textureHolder, lvl);
     }
 
     public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput): void {
         this.environmentRenderer.prepareToRender(device, renderInstManager, viewerInput);
-        this.triModelsRenderer.prepareToRender(device, renderInstManager, viewerInput);
+        //this.triModelsRenderer.prepareToRender(device, renderInstManager, viewerInput);
+        this.billboardsRenderer.prepareToRender(device, renderInstManager, viewerInput);
     }
 
     public destroy(device: GfxDevice): void {
         this.environmentRenderer.destroy(device);
         this.triModelsRenderer.destroy(device);
+        this.billboardsRenderer.destroy(device);
     }
 }
 
