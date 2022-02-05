@@ -463,6 +463,7 @@ class ModelsRenderer {
 
         const template = renderInstManager.pushTemplateRenderInst();
         template.setBindingLayouts(ModelsRenderer.bindingLayouts);
+        template.setSamplerBindingsFromTextureMappings(this.textureMapping);
 
         let offs = template.allocateUniformBuffer(ModelProgram.ub_SceneParams, 16);
         const sceneParamsMapped = template.mapUniformBufferF32(ModelProgram.ub_SceneParams);
@@ -499,7 +500,6 @@ class ModelsRenderer {
         renderInst.drawIndexes(gfxBuffers.indexCount);
 
         renderInst.setGfxProgram(gfxProgram);
-        renderInst.setSamplerBindingsFromTextureMappings(this.textureMapping);
         renderInst.setMegaStateFlags(megaState);
 
         renderInst.sortKey = makeSortKey(GfxRendererLayer.OPAQUE, gfxProgram.ResourceUniqueId);
