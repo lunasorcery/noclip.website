@@ -73,7 +73,24 @@ export interface Model {
     polys: Poly[],
 }
 
-interface Track {
+interface PhysicsVert {
+    x: number,
+    z: number,
+}
+
+interface PhysicsPoly {
+    num_verts: number,
+    unk1: number,
+    unk2: number,
+    unk3: number,
+    y: number,
+    dydx: number,
+    dydz: number,
+    indices: number[],
+    neighbors: number[],
+}
+
+export interface Track {
     unk1: number,
     spacing_x: number,
     unk2: number,
@@ -81,8 +98,8 @@ interface Track {
     size_x: number,
     size_z: number,
     layout: Int16Array,
-    //physics_verts: any,
-    //physics_polys: any,
+    physics_verts: PhysicsVert[],
+    physics_polys: PhysicsPoly[],
 }
 
 export interface Zone {
@@ -211,6 +228,31 @@ function readModel(stream: DataStream): Model {
     return { zero, unk1, min_x, min_y, min_z, max_x, max_y, max_z, verts, polys };
 }
 
+function readPhysicsVert(stream: DataStream): PhysicsVert {
+    const x = stream.readUint32() / 0x1000;
+    const z = stream.readUint32() / 0x1000;
+    return { x, z };
+}
+
+function readPhysicsPoly(stream: DataStream): PhysicsPoly {
+    const num_verts = stream.readUint8();
+    const unk1 = stream.readUint8();
+    const unk2 = stream.readUint8();
+    const unk3 = stream.readUint8();
+    const y    = stream.readInt32() / 0x1000;
+    const dydx = stream.readInt32() / 0x1000;
+    const dydz = stream.readInt32() / 0x1000;
+    let indices :number[] =[];
+    for (let i = 0; i < num_verts; ++i) {
+        indices.push(stream.readUint16());
+    }
+    let neighbors :number[] =[];
+    for (let i = 0; i < num_verts; ++i) {
+        neighbors.push(stream.readUint16());
+    }
+    return { num_verts, unk1, unk2, unk3, y, dydx, dydz, indices, neighbors };
+}
+
 function readTrack(stream: DataStream): Track {
     const addr_base = stream.offs;
 
@@ -225,14 +267,31 @@ function readTrack(stream: DataStream): Track {
     const ptr_physics_polys = stream.readUint32();
     const num_physics_verts = stream.readUint16();
     const num_physics_polys = stream.readUint16();
-    
+
     stream.offs = addr_base + ptr_layout;
-    let layout = new Int16Array(size_x*size_z);
-    for (let i = 0; i < size_x*size_z; ++i) {
+    let layout = new Int16Array(size_x * size_z);
+    for (let i = 0; i < size_x * size_z; ++i) {
         layout[i] = stream.readInt16();
     }
 
-    return { unk1, spacing_x, unk2, spacing_z, size_x, size_z, layout };
+    stream.offs = addr_base + ptr_physics_verts;
+    let physics_verts: PhysicsVert[] = [];
+    for (let i = 0; i < num_physics_verts; ++i) {
+        physics_verts.push(readPhysicsVert(stream));
+    }
+
+    stream.offs = addr_base + ptr_physics_polys;
+    let physics_poly_ptrs: number[] = [];
+    for (let i = 0; i < num_physics_polys; ++i) {
+        physics_poly_ptrs.push(stream.readUint32());
+    }
+    let physics_polys: PhysicsPoly[] = [];
+    for (let i = 0; i < num_physics_polys; ++i) {
+        stream.offs = addr_base + ptr_physics_polys + physics_poly_ptrs[i];
+        physics_polys.push(readPhysicsPoly(stream));
+    }
+
+    return { unk1, spacing_x, unk2, spacing_z, size_x, size_z, layout, physics_verts, physics_polys };
 }
 
 export function parseZone(buffer: ArrayBufferSlice): Zone {
@@ -265,7 +324,7 @@ export function parseZone(buffer: ArrayBufferSlice): Zone {
 
     let tracks: Track[] = [];
     for (let i = 0; i < num_tracks; ++i) {
-        stream.offs = ptr_track_headers + (i*28);
+        stream.offs = ptr_track_headers + (i * 28);
         tracks.push(readTrack(stream));
     }
 

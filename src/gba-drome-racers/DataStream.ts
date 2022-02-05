@@ -13,6 +13,7 @@ export class DataStream {
     public readUint8(): number { return this.view.getUint8(this.offs++); }
     public readInt16(): number { const v = this.view.getInt16(this.offs, true); this.offs += 0x02; return v; }
     public readUint16(): number { const v = this.view.getUint16(this.offs, true); this.offs += 0x02; return v; }
+    public readInt32(): number { const v = this.view.getInt32(this.offs, true); this.offs += 0x04; return v; }
     public readUint32(): number { const v = this.view.getUint32(this.offs, true); this.offs += 0x04; return v; }
     public readFloat32(): number { const v = this.view.getFloat32(this.offs, true); this.offs += 0x04; return v; }
 

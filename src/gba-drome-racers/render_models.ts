@@ -372,10 +372,7 @@ export class ModelsRenderer {
             for (let x = 0; x < track.size_x; ++x) {
                 const model_id = track.layout[z * track.size_x + x];
                 if (model_id >= 0) {
-                    const modelPos = vec3.fromValues(
-                        (x - ((track.size_x-1) / 2)) * track.spacing_x,
-                        -128,
-                        (z - ((track.size_z-1) / 2)) * track.spacing_z);
+                    const modelPos = vec3.fromValues((x+.5) * track.spacing_x, 0, ((z+.5) - track.size_z) * track.spacing_z);
                     const modelInst = new ModelInstance(this.modelDatas[model_id], modelPos);
                     this.modelInstances.push(modelInst);
                 }

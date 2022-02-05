@@ -13,6 +13,7 @@ import { GfxRenderCache } from "../gfx/render/GfxRenderCache";
 import { decodeTextureData } from "./gba_common";
 import { ModelsRenderer } from "./render_models"
 import { SkyRenderer } from "./render_sky"
+import { PhysicsRenderer } from "./render_physics"
 
 export interface DromeTexture {
     name: string;
@@ -52,20 +53,27 @@ export class DromeTextureHolder extends TextureHolder<DromeTexture> {
 export class SceneRenderer {
     private modelsRenderer: ModelsRenderer;
     private skyRenderer: SkyRenderer;
+    private physicsRenderer: PhysicsRenderer | null = null;
 
     constructor(cache: GfxRenderCache, textureHolder: DromeTextureHolder, zone: DromeData.Zone, track_id: number, sky: Uint16Array) {
         this.modelsRenderer = new ModelsRenderer(cache, textureHolder, zone, track_id);
         this.skyRenderer = new SkyRenderer(cache, sky);
+        if (zone.tracks[track_id].physics_polys.length > 0)
+            this.physicsRenderer = new PhysicsRenderer(cache, zone.tracks[track_id]);
     }
 
     public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput): void {
         this.modelsRenderer.prepareToRender(device, renderInstManager, viewerInput);
         this.skyRenderer.prepareToRender(device, renderInstManager, viewerInput);
+        if (this.physicsRenderer !== null)
+            this.physicsRenderer.prepareToRender(device, renderInstManager, viewerInput);
     }
 
     public destroy(device: GfxDevice): void {
         this.modelsRenderer.destroy(device);
         this.skyRenderer.destroy(device);
+        if (this.physicsRenderer !== null)
+            this.physicsRenderer.destroy(device);
     }
 }
 
