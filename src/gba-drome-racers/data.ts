@@ -11,9 +11,9 @@ interface Vertex {
 
 export enum PolyType {
     End = 0,
-    Poly1 = 1,
-    Poly2 = 2,
-    Poly5 = 5,
+    Poly1 = 1, // colored, single-sided
+    Poly2 = 2, // colored, double-sided?
+    Poly5 = 5, // textured, single-sided
 }
 
 type Poly =
