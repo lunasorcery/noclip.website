@@ -79,6 +79,7 @@ import * as Scenes_DiddyKongRacing from './DiddyKongRacing/scenes';
 import * as Scenes_SpongebobRevengeOfTheFlyingDutchman from "./SpongebobRevengeOfTheFlyingDutchman/scenes";
 import * as Scenes_MarioKart8Deluxe from './MarioKart8Deluxe/Scenes';
 import * as Scenes_JetSetRadio from './JetSetRadio/Scenes';
+import * as Scenes_GbaDromeRacers from './gba-drome-racers/scenes';
 
 import { DroppedFileSceneDesc, traverseFileSystemDataTransfer } from './Scenes_FileDrops';
 
@@ -193,6 +194,7 @@ const sceneGroups = [
     Scenes_MarioKart8Deluxe.sceneGroup,
     Scenes_TheStanleyParable.sceneGroup,
     Scenes_JetSetRadio.sceneGroup,
+    Scenes_GbaDromeRacers.sceneGroup,
 ];
 
 function convertCanvasToPNG(canvas: HTMLCanvasElement): Promise<Blob> {
