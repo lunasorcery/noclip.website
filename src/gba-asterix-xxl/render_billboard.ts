@@ -141,8 +141,6 @@ class BillboardInstance {
 	private sortKey: number = 0;
 
 	constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, public billboardData: BillboardData) {
-		console.log(this.billboardData);
-
 		this.program = new BillboardProgram();
 
 		const gfxSampler = cache.createSampler({

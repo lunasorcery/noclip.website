@@ -1,5 +1,6 @@
 
 import ArrayBufferSlice from "../ArrayBufferSlice";
+import { hexzero } from "../util";
 import { DataStream } from "./DataStream";
 
 const V3D_LEVEL_WIDTH_CELLS = 12;
@@ -395,9 +396,6 @@ function readAsterixObjElevator(stream: DataStream): AsterixObjElevator {
     const unused = stream.readUint8();
     const render_model = readAsterixTriModel(stream);
 
-    console.log(dummy_model);
-    console.log(render_model);
-
     return {
         type: AsterixObjectType.Elevator,
         state_flags,
@@ -493,8 +491,10 @@ function readAsterixObjectPayload(stream: DataStream): AsterixObject | null {
         //case 0x24: _24,
         //case 0x25: _25,
         //case 0x26: _26,
+        default:
+            console.log(`unimplemented object type ${hexzero(obj_type, 2)}`);
+            return null;
     }
-    return null;
 }
 
 function readAsterixGenericObjects(stream: DataStream, offsets: number[]): AsterixGenericObject[] {
