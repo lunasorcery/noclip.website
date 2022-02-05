@@ -572,8 +572,8 @@ class SkyGfxBuffers {
         this.indexCount = idxData.length;
 
         const vertexAttributeDescriptors: GfxVertexAttributeDescriptor[] = [
-            { location: ModelProgram.a_Position, bufferIndex: 0, bufferByteOffset: 0, format: GfxFormat.F32_RG },
-            { location: ModelProgram.a_Color, bufferIndex: 1, bufferByteOffset: 0, format: GfxFormat.U8_RGBA_NORM },
+            { location: SkyProgram.a_Position, bufferIndex: 0, bufferByteOffset: 0, format: GfxFormat.F32_RG },
+            { location: SkyProgram.a_Color, bufferIndex: 1, bufferByteOffset: 0, format: GfxFormat.U8_RGBA_NORM },
         ];
         const vertexBufferDescriptors: GfxInputLayoutBufferDescriptor[] = [
             { byteStride: 0x08, frequency: GfxVertexBufferFrequency.PerVertex },
