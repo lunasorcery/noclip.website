@@ -74,12 +74,12 @@ export interface Model {
 }
 
 interface Track {
-    unk1: number,      // .2byte 0x0000 always?
-    spacing_x: number, // .2byte 0x0100 on DR, 0x0200 on HW
-    unk2: number,      // .2byte 0x1000 on DR, 0x2000 on HW
-    spacing_z: number, // .2byte 0x0100 on DR, 0x0200 on HW
-    width: number,  //.2byte 23 ; width
-    height: number, //.2byte 16 ; height
+    unk1: number,
+    spacing_x: number,
+    unk2: number,
+    spacing_z: number,
+    size_x: number,
+    size_z: number,
     layout: Int16Array,
     //physics_verts: any,
     //physics_polys: any,
@@ -214,25 +214,25 @@ function readModel(stream: DataStream): Model {
 function readTrack(stream: DataStream): Track {
     const addr_base = stream.offs;
 
-    const unk1 = stream.readUint16();      // .2byte 0x0000 always?
-    const spacing_x = stream.readUint16(); // .2byte 0x0100 on DR, 0x0200 on HW
-    const unk2 = stream.readUint16();      // .2byte 0x1000 on DR, 0x2000 on HW
-    const spacing_z = stream.readUint16(); // .2byte 0x0100 on DR, 0x0200 on HW
-    const width = stream.readUint16();  //.2byte 23 ; width
-    const height = stream.readUint16(); //.2byte 16 ; height
-    const ptr_layout = stream.readUint32(); //.4byte _EU0817D9C0_NA0817D28C_zone0_track0_layout_map - _EU0817D96C_NA0817D238_zone0_track0_layout_header
-    const ptr_physics_verts = stream.readUint32();  //.4byte _EU0817DCA0_NA0817D56C_zone0_track0_layout_physics_verts - _EU0817D96C_NA0817D238_zone0_track0_layout_header
-    const ptr_physics_polys = stream.readUint32();  //.4byte _EU0817E640_NA0817DF0C_zone0_track0_layout_physics_polys - _EU0817D96C_NA0817D238_zone0_track0_layout_header
-    const num_physics_verts = stream.readUint16();  //.2byte 308 ; number of physics verts
-    const num_physics_polys = stream.readUint16();  //.2byte 284 ; number of physics polys
+    const unk1 = stream.readUint16();      // 0x0000 always?
+    const spacing_x = stream.readUint16(); // 0x0100 on Drome Racers, 0x0200 on Hot Wheels
+    const unk2 = stream.readUint16();      // 0x1000 on Drome Racers, 0x2000 on Hot Wheels
+    const spacing_z = stream.readUint16(); // 0x0100 on Drome Racers, 0x0200 on Hot Wheels
+    const size_x = stream.readUint16();
+    const size_z = stream.readUint16();
+    const ptr_layout = stream.readUint32();
+    const ptr_physics_verts = stream.readUint32();
+    const ptr_physics_polys = stream.readUint32();
+    const num_physics_verts = stream.readUint16();
+    const num_physics_polys = stream.readUint16();
     
     stream.offs = addr_base + ptr_layout;
-    let layout = new Int16Array(width*height);
-    for (let i = 0; i < width*height; ++i) {
+    let layout = new Int16Array(size_x*size_z);
+    for (let i = 0; i < size_x*size_z; ++i) {
         layout[i] = stream.readInt16();
     }
 
-    return { unk1, spacing_x, unk2, spacing_z, width, height, layout };
+    return { unk1, spacing_x, unk2, spacing_z, size_x, size_z, layout };
 }
 
 export function parseZone(buffer: ArrayBufferSlice): Zone {

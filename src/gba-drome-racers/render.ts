@@ -407,14 +407,14 @@ class ModelsRenderer {
 
         // load track layout
         const track = zone.tracks[track_id];
-        for (let z = 0; z < track.height; ++z) {
-            for (let x = 0; x < track.width; ++x) {
-                const model_id = track.layout[z * track.width + x];
+        for (let z = 0; z < track.size_z; ++z) {
+            for (let x = 0; x < track.size_x; ++x) {
+                const model_id = track.layout[z * track.size_x + x];
                 if (model_id >= 0) {
                     const modelPos = vec3.fromValues(
-                        (x - ((track.width-1) / 2)) * track.spacing_x,
+                        (x - ((track.size_x-1) / 2)) * track.spacing_x,
                         -128,
-                        (z - ((track.height-1) / 2)) * track.spacing_z);
+                        (z - ((track.size_z-1) / 2)) * track.spacing_z);
                     const modelInst = new ModelInstance(this.modelDatas[model_id], modelPos);
                     this.modelInstances.push(modelInst);
                 }
