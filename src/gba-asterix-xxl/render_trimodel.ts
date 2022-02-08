@@ -61,23 +61,32 @@ void main() {
 void main() {
     vec4 t_Color = vec4(1.0);
 
-    const int FLAG_TEXTURE1 = 0x02;
-    const int FLAG_TEXTURE2 = 0x04;
-    const int FLAG_TEXTURE  = (FLAG_TEXTURE1 | FLAG_TEXTURE2);
-    const int FLAG_ALL      = 0x0F;
+    int polyType = v_PolyFlags & 0x0F;
 
-    if ((v_PolyFlags & FLAG_ALL) == 0)
+    const int TYPE_INVISIBLE = 0;
+    const int TYPE_COLORED   = 1;
+    const int TYPE_TEXTURE1  = 3;
+    const int TYPE_TEXTURE2  = 4;
+
+    if (polyType == TYPE_INVISIBLE)
     {
-        //discard;
-        
-        // halftone effect to show collision:
+#ifdef SHOW_COLLISION
+        // halftone effect
+        t_Color = vec4(.5,0,0,0);
         ivec2 fc = ivec2(gl_FragCoord);
         if (((fc.x ^ fc.y) & 4) != 0)
+        {
             discard;
-
-        t_Color = vec4(.5,0,0,0);
+        }
+#else
+        discard;
+#endif
     }
-    else if ((v_PolyFlags & FLAG_TEXTURE) != 0)
+    else if (polyType == TYPE_COLORED)
+    {
+        t_Color.rgb = v_Color.rgb;
+    }
+    else if (polyType == TYPE_TEXTURE1 || polyType == TYPE_TEXTURE2)
     {
         int texId = v_PolyFlags >> 4;
         vec2 texCoord = v_TexCoord / 256.;
@@ -90,7 +99,7 @@ void main() {
     }
     else
     {
-        t_Color.rgb = v_Color.rgb;
+        t_Color.rgb = vec4(1,0,1,1);
     }
 
     gl_FragColor = t_Color;
@@ -182,9 +191,10 @@ class TriModelData {
             const i1 = poly.indices[1];
             const i2 = poly.indices[2];
 
-            const doRender = (poly.flags & 0x1) != 0;
-            const isTextured = (poly.flags & 0x2) != 0;
-            const isColored = !isTextured;
+            const polyType = (poly.flags & 0xf);
+            const doRender = (polyType != 0);
+            const isColored = (polyType == 1);
+            const isTextured = (polyType == 3) || (polyType == 4);
             const color = isColored
                 ? decodeBGR555(palette[poly.uvs[0].u])
                 : 0;
