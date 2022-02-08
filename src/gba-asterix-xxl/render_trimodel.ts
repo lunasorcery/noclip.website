@@ -11,8 +11,8 @@ import ArrayBufferSlice from "../ArrayBufferSlice";
 import { nArray } from "../util";
 import { GfxRendererLayer, GfxRenderInstManager, makeSortKey } from "../gfx/render/GfxRenderInstManager";
 import { GfxRenderCache } from "../gfx/render/GfxRenderCache";
-import {AsterixTextureHolder} from "./render";
-import {decodeBGR555} from "./gba_common";
+import { AsterixTextureHolder } from "./render";
+import { decodeBGR555 } from "./gba_common";
 
 class TriModelProgram extends DeviceProgram {
     public static a_Position = 0;
@@ -371,7 +371,7 @@ export class TriModelsRenderer {
 
         let offs = template.allocateUniformBuffer(TriModelProgram.ub_SceneParams, 16);
         const sceneParamsMapped = template.mapUniformBufferF32(TriModelProgram.ub_SceneParams);
-		offs += fillMatrix4x4(sceneParamsMapped, offs, viewerInput.camera.projectionMatrix);
+        offs += fillMatrix4x4(sceneParamsMapped, offs, viewerInput.camera.projectionMatrix);
 
         for (let i = 0; i < this.triModelInstances.length; ++i) {
             this.triModelInstances[i].prepareToRender(device, renderInstManager, viewerInput);

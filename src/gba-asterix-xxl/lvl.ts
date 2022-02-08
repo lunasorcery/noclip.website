@@ -67,14 +67,14 @@ interface AsterixXZBounds {
 }
 
 export interface AsterixCommonBillboard {
-	tex_id: number,
-	pos: AsterixVertex,
-	width: number,
-	height: number,
-	left: number,
-	top: number,
-	right: number,
-	bottom: number,
+    tex_id: number,
+    pos: AsterixVertex,
+    width: number,
+    height: number,
+    left: number,
+    top: number,
+    right: number,
+    bottom: number,
 }
 
 export interface AsterixObjSolidModel {
