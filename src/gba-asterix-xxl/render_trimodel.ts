@@ -20,6 +20,7 @@ class TriModelProgram extends DeviceProgram {
     public static a_Position = 0;
     public static a_Color = 1;
     public static a_TexCoord0 = 2;
+    public static a_TexCoord1 = 3;
 
     public static ub_SceneParams = 0;
     public static ub_MeshFragParams = 1;
@@ -42,18 +43,19 @@ uniform sampler2D u_Tex2;
 
 varying vec4 v_Color;
 varying vec2 v_TexCoord;
-flat varying int v_PolyFlags;
+flat varying int v_Params;
 
 #ifdef VERT
 layout(location = ${TriModelProgram.a_Position})  in vec3 a_Position;
 layout(location = ${TriModelProgram.a_Color})     in vec4 a_Color;
-layout(location = ${TriModelProgram.a_TexCoord0}) in vec3 a_TexCoord0;
+layout(location = ${TriModelProgram.a_TexCoord0}) in vec2 a_TexCoord0;
+layout(location = ${TriModelProgram.a_TexCoord1}) in float a_TexCoord1;
 
 void main() {
     gl_Position = Mul(u_Projection, Mul(_Mat4x4(u_ModelView), vec4(a_Position, 1.0)));
     v_Color     = a_Color;
-    v_TexCoord  = a_TexCoord0.xy;
-    v_PolyFlags = int(a_TexCoord0.z);
+    v_TexCoord  = a_TexCoord0;
+    v_Params    = int(a_TexCoord1);
 }
 #endif
 
@@ -61,7 +63,7 @@ void main() {
 void main() {
     vec4 t_Color = vec4(1.0);
 
-    int polyType = v_PolyFlags & 0x0F;
+    int polyType = v_Params & 0x0F;
 
     const int TYPE_INVISIBLE = 0;
     const int TYPE_COLORED   = 1;
@@ -88,7 +90,7 @@ void main() {
     }
     else if (polyType == TYPE_TEXTURE1 || polyType == TYPE_TEXTURE2)
     {
-        int texId = v_PolyFlags >> 4;
+        int texId = v_Params >> 4;
         vec2 texCoord = v_TexCoord / 256.;
         if (texId == 0) { t_Color = texture(SAMPLER_2D(u_Tex0), texCoord); }
         if (texId == 1) { t_Color = texture(SAMPLER_2D(u_Tex1), texCoord); }
@@ -99,7 +101,7 @@ void main() {
     }
     else
     {
-        t_Color.rgb = vec4(1,0,1,1);
+        t_Color.rgb = vec3(1,0,1);
     }
 
     gl_FragColor = t_Color;
@@ -112,6 +114,7 @@ class TriModelGfxBuffers {
     private vertBuffer: GfxBuffer;
     private colorBuffer: GfxBuffer;
     private uvBuffer: GfxBuffer;
+    private paramBuffer: GfxBuffer;
     private idxBuffer: GfxBuffer;
     public inputLayout: GfxInputLayout;
     public inputState: GfxInputState;
@@ -122,10 +125,12 @@ class TriModelGfxBuffers {
         public verts: ArrayBufferSlice,
         public colors: ArrayBufferSlice,
         public uvs: ArrayBufferSlice,
+        public params: ArrayBufferSlice,
         public indices: Uint16Array) {
         this.vertBuffer = makeStaticDataBufferFromSlice(device, GfxBufferUsage.Vertex, verts);
         this.colorBuffer = makeStaticDataBufferFromSlice(device, GfxBufferUsage.Vertex, colors);
         this.uvBuffer = makeStaticDataBufferFromSlice(device, GfxBufferUsage.Vertex, uvs);
+        this.paramBuffer = makeStaticDataBufferFromSlice(device, GfxBufferUsage.Vertex, params);
 
         const idxData = filterDegenerateTriangleIndexBuffer(indices);
         this.idxBuffer = makeStaticDataBuffer(device, GfxBufferUsage.Index, idxData.buffer);
@@ -134,12 +139,14 @@ class TriModelGfxBuffers {
         const vertexAttributeDescriptors: GfxVertexAttributeDescriptor[] = [
             { location: TriModelProgram.a_Position, bufferIndex: 0, bufferByteOffset: 0, format: GfxFormat.S16_RGB },
             { location: TriModelProgram.a_Color, bufferIndex: 1, bufferByteOffset: 0, format: GfxFormat.U8_RGBA_NORM },
-            { location: TriModelProgram.a_TexCoord0, bufferIndex: 2, bufferByteOffset: 0, format: GfxFormat.U8_RGB },
+            { location: TriModelProgram.a_TexCoord0, bufferIndex: 2, bufferByteOffset: 0, format: GfxFormat.U8_RG },
+            { location: TriModelProgram.a_TexCoord1, bufferIndex: 3, bufferByteOffset: 0, format: GfxFormat.U8_R },
         ];
         const vertexBufferDescriptors: (GfxInputLayoutBufferDescriptor | null)[] = [
             { byteStride: 0x06, frequency: GfxVertexBufferFrequency.PerVertex },
             { byteStride: 0x04, frequency: GfxVertexBufferFrequency.PerVertex },
-            { byteStride: 0x03, frequency: GfxVertexBufferFrequency.PerVertex },
+            { byteStride: 0x02, frequency: GfxVertexBufferFrequency.PerVertex },
+            { byteStride: 0x01, frequency: GfxVertexBufferFrequency.PerVertex },
         ];
 
         this.inputLayout = device.createInputLayout({
@@ -151,6 +158,7 @@ class TriModelGfxBuffers {
             { buffer: this.vertBuffer, byteOffset: 0 },
             { buffer: this.colorBuffer, byteOffset: 0 },
             { buffer: this.uvBuffer, byteOffset: 0 },
+            { buffer: this.paramBuffer, byteOffset: 0 },
         ];
         const idxBuffer: GfxIndexBufferDescriptor = { buffer: this.idxBuffer, byteOffset: 0 };
         this.inputState = device.createInputState(this.inputLayout, buffers, idxBuffer);
@@ -160,6 +168,7 @@ class TriModelGfxBuffers {
         device.destroyBuffer(this.vertBuffer);
         device.destroyBuffer(this.colorBuffer);
         device.destroyBuffer(this.uvBuffer);
+        device.destroyBuffer(this.paramBuffer);
         device.destroyBuffer(this.idxBuffer);
         device.destroyInputLayout(this.inputLayout);
         device.destroyInputState(this.inputState);
@@ -174,16 +183,19 @@ class TriModelData {
         const vertsPerPoly = 3;
         const indicesPerPoly = 3;
         const channelsPerVert = 3;
-        const channelsPerUv = 3;
+        const channelsPerUv = 2;
+        const channelsPerParam = 1;
 
         let verts = new Int16Array(numPolys * vertsPerPoly * channelsPerVert);
         let colors = new Uint32Array(numPolys * vertsPerPoly);
         let uvs = new Uint8Array(numPolys * vertsPerPoly * channelsPerUv);
+        let params = new Uint8Array(numPolys * vertsPerPoly * channelsPerParam);
         let indices = new Uint16Array(numPolys * indicesPerPoly);
 
         let vertIdx = 0;
         let colIdx = 0;
         let uvIdx = 0;
+        let paramIdx = 0;
         let idxIdx = 0;
         for (let i = 0; i < numPolys; ++i) {
             const poly = model.polys[i];
@@ -192,14 +204,14 @@ class TriModelData {
             const i2 = poly.indices[2];
 
             const polyType = (poly.flags & 0xf);
-            const doRender = (polyType != 0);
+            const isVisible = (polyType != 0);
             const isColored = (polyType == 1);
             const isTextured = (polyType == 3) || (polyType == 4);
             const color = isColored
                 ? decodeBGR555(palette[poly.uvs[0].u])
                 : 0;
 
-            if (doRender) {
+            {
                 const currVertBase = vertIdx / channelsPerVert;
                 indices[idxIdx++] = currVertBase + 0;
                 indices[idxIdx++] = currVertBase + 1;
@@ -211,7 +223,7 @@ class TriModelData {
                 colors[colIdx++] = color;
                 uvs[uvIdx++] = poly.uvs[0].u;
                 uvs[uvIdx++] = poly.uvs[0].v;
-                uvs[uvIdx++] = poly.flags;
+                params[paramIdx++] = poly.flags;
 
                 verts[vertIdx++] = model.verts[i1].x;
                 verts[vertIdx++] = model.verts[i1].y;
@@ -219,7 +231,7 @@ class TriModelData {
                 colors[colIdx++] = color;
                 uvs[uvIdx++] = poly.uvs[1].u;
                 uvs[uvIdx++] = poly.uvs[1].v;
-                uvs[uvIdx++] = poly.flags;
+                params[paramIdx++] = poly.flags;
 
                 verts[vertIdx++] = model.verts[i2].x;
                 verts[vertIdx++] = model.verts[i2].y;
@@ -227,7 +239,7 @@ class TriModelData {
                 colors[colIdx++] = color;
                 uvs[uvIdx++] = poly.uvs[2].u;
                 uvs[uvIdx++] = poly.uvs[2].v;
-                uvs[uvIdx++] = poly.flags;
+                params[paramIdx++] = poly.flags;
             }
         }
 
@@ -236,6 +248,7 @@ class TriModelData {
             new ArrayBufferSlice(verts.buffer),
             new ArrayBufferSlice(colors.buffer),
             new ArrayBufferSlice(uvs.buffer),
+            new ArrayBufferSlice(params.buffer),
             indices);
     }
 }
