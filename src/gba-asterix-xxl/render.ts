@@ -57,8 +57,8 @@ export class SceneRenderer {
     private triModelsRenderer: TriModelsRenderer;
     private billboardsRenderer: BillboardsRenderer;
 
-    constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, lvl: AsterixLvl) {
-        this.environmentRenderer = new EnvironmentRenderer(cache, textureHolder, lvl);
+    constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, lvl: AsterixLvl, tex_scroll: ArrayBufferSlice) {
+        this.environmentRenderer = new EnvironmentRenderer(cache, textureHolder, lvl, tex_scroll);
         this.triModelsRenderer = new TriModelsRenderer(cache, textureHolder, lvl);
         this.billboardsRenderer = new BillboardsRenderer(cache, textureHolder, lvl);
     }

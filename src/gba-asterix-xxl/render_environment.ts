@@ -6,7 +6,7 @@ import * as Viewer from "../viewer";
 import { makeStaticDataBuffer, makeStaticDataBufferFromSlice } from "../gfx/helpers/BufferHelpers";
 import { DeviceProgram } from "../Program";
 import { filterDegenerateTriangleIndexBuffer } from "../gfx/helpers/TopologyHelpers";
-import { fillMatrix4x3, fillMatrix4x4 } from "../gfx/helpers/UniformBufferHelpers";
+import { fillMatrix4x3, fillMatrix4x4, fillVec4v } from "../gfx/helpers/UniformBufferHelpers";
 import { computeViewSpaceDepthFromWorldSpaceAABB } from "../Camera";
 import ArrayBufferSlice from "../ArrayBufferSlice";
 import { nArray, assertExists, assert } from "../util";
@@ -14,11 +14,13 @@ import { GfxRendererLayer, GfxRenderInstManager, makeSortKey, setSortKeyDepth } 
 import { GfxRenderCache } from "../gfx/render/GfxRenderCache";
 import { AsterixTextureHolder } from "./render";
 import { decodeBGR555 } from "./gba_common";
+import { vec4 } from "gl-matrix";
 
 class EnvironmentProgram extends DeviceProgram {
 	public static a_Position = 0;
 	public static a_Color = 1;
 	public static a_TexCoord0 = 2;
+	public static a_TexCoord1 = 3;
 
 	public static ub_SceneParams = 0;
 	public static ub_MeshFragParams = 1;
@@ -33,6 +35,7 @@ layout(std140) uniform ub_SceneParams {
 
 layout(std140) uniform ub_MeshFragParams {
     Mat4x3 u_ModelView;
+    vec4 u_TexScroll; // { scroll_x, _, _, _ }
 };
 
 uniform sampler2D u_Tex0;
@@ -41,18 +44,19 @@ uniform sampler2D u_Tex2;
 
 varying vec4 v_Color;
 varying vec2 v_TexCoord;
-flat varying int v_PolyFlags;
+flat varying ivec2 v_Params;
 
 #ifdef VERT
 layout(location = ${EnvironmentProgram.a_Position})  in vec3 a_Position;
 layout(location = ${EnvironmentProgram.a_Color})     in vec4 a_Color;
-layout(location = ${EnvironmentProgram.a_TexCoord0}) in vec3 a_TexCoord0;
+layout(location = ${EnvironmentProgram.a_TexCoord0}) in vec2 a_TexCoord0;
+layout(location = ${EnvironmentProgram.a_TexCoord1}) in vec2 a_TexCoord1;
 
 void main() {
     gl_Position = Mul(u_Projection, Mul(_Mat4x4(u_ModelView), vec4(a_Position, 1.0)));
     v_Color     = a_Color;
-    v_TexCoord  = a_TexCoord0.xy;
-    v_PolyFlags = int(a_TexCoord0.z);
+    v_TexCoord  = a_TexCoord0;
+    v_Params    = ivec2(a_TexCoord1);
 }
 #endif
 
@@ -63,14 +67,22 @@ void main() {
     const int FLAG_RENDER  = 0x01;
     const int FLAG_TEXTURE = 0x02;
 
-    if ((v_PolyFlags & FLAG_RENDER) == 0)
+    int quadIdx = v_Params.x;
+    int polyFlags = v_Params.y;
+
+    if ((polyFlags & FLAG_RENDER) == 0)
     {
         discard;
     }
-    else if ((v_PolyFlags & FLAG_TEXTURE) != 0)
+    else if ((polyFlags & FLAG_TEXTURE) != 0)
     {
-        int texId = v_PolyFlags >> 4;
-        vec2 texCoord = v_TexCoord / 256.;
+        int texId = polyFlags >> 4;
+        vec2 texCoord = v_TexCoord;
+        if (quadIdx == 0)
+        {
+            texCoord.x += u_TexScroll.x;
+        }
+        texCoord /= 256.;
         if (texId == 0) { t_Color = texture(SAMPLER_2D(u_Tex0), texCoord); }
         if (texId == 1) { t_Color = texture(SAMPLER_2D(u_Tex1), texCoord); }
         if (texId == 2) { t_Color = texture(SAMPLER_2D(u_Tex2), texCoord); }
@@ -93,6 +105,7 @@ class EnvironmentGfxBuffers {
 	private vertBuffer: GfxBuffer;
 	private colorBuffer: GfxBuffer;
 	private uvBuffer: GfxBuffer;
+	private paramBuffer: GfxBuffer;
 	private idxBuffer: GfxBuffer;
 	public inputLayout: GfxInputLayout;
 	public inputState: GfxInputState;
@@ -103,10 +116,12 @@ class EnvironmentGfxBuffers {
 		public verts: ArrayBufferSlice,
 		public colors: ArrayBufferSlice,
 		public uvs: ArrayBufferSlice,
+		public params: ArrayBufferSlice,
 		public indices: Uint16Array) {
 		this.vertBuffer = makeStaticDataBufferFromSlice(device, GfxBufferUsage.Vertex, verts);
 		this.colorBuffer = makeStaticDataBufferFromSlice(device, GfxBufferUsage.Vertex, colors);
 		this.uvBuffer = makeStaticDataBufferFromSlice(device, GfxBufferUsage.Vertex, uvs);
+		this.paramBuffer = makeStaticDataBufferFromSlice(device, GfxBufferUsage.Vertex, params);
 
 		const idxData = filterDegenerateTriangleIndexBuffer(indices);
 		this.idxBuffer = makeStaticDataBuffer(device, GfxBufferUsage.Index, idxData.buffer);
@@ -115,12 +130,14 @@ class EnvironmentGfxBuffers {
 		const vertexAttributeDescriptors: GfxVertexAttributeDescriptor[] = [
 			{ location: EnvironmentProgram.a_Position, bufferIndex: 0, bufferByteOffset: 0, format: GfxFormat.S16_RGB },
 			{ location: EnvironmentProgram.a_Color, bufferIndex: 1, bufferByteOffset: 0, format: GfxFormat.U8_RGBA_NORM },
-			{ location: EnvironmentProgram.a_TexCoord0, bufferIndex: 2, bufferByteOffset: 0, format: GfxFormat.U8_RGB },
+			{ location: EnvironmentProgram.a_TexCoord0, bufferIndex: 2, bufferByteOffset: 0, format: GfxFormat.U8_RG },
+			{ location: EnvironmentProgram.a_TexCoord1, bufferIndex: 3, bufferByteOffset: 0, format: GfxFormat.U8_RG },
 		];
 		const vertexBufferDescriptors: (GfxInputLayoutBufferDescriptor | null)[] = [
 			{ byteStride: 0x06, frequency: GfxVertexBufferFrequency.PerVertex },
 			{ byteStride: 0x04, frequency: GfxVertexBufferFrequency.PerVertex },
-			{ byteStride: 0x03, frequency: GfxVertexBufferFrequency.PerVertex },
+			{ byteStride: 0x02, frequency: GfxVertexBufferFrequency.PerVertex },
+			{ byteStride: 0x02, frequency: GfxVertexBufferFrequency.PerVertex },
 		];
 
 		this.inputLayout = device.createInputLayout({
@@ -132,6 +149,7 @@ class EnvironmentGfxBuffers {
 			{ buffer: this.vertBuffer, byteOffset: 0 },
 			{ buffer: this.colorBuffer, byteOffset: 0 },
 			{ buffer: this.uvBuffer, byteOffset: 0 },
+			{ buffer: this.paramBuffer, byteOffset: 0 },
 		];
 		const idxBuffer: GfxIndexBufferDescriptor = { buffer: this.idxBuffer, byteOffset: 0 };
 		this.inputState = device.createInputState(this.inputLayout, buffers, idxBuffer);
@@ -141,6 +159,7 @@ class EnvironmentGfxBuffers {
 		device.destroyBuffer(this.vertBuffer);
 		device.destroyBuffer(this.colorBuffer);
 		device.destroyBuffer(this.uvBuffer);
+		device.destroyBuffer(this.paramBuffer);
 		device.destroyBuffer(this.idxBuffer);
 		device.destroyInputLayout(this.inputLayout);
 		device.destroyInputState(this.inputState);
@@ -154,16 +173,19 @@ class EnvironmentData {
 		const numCells = 12 * lvl.lvlHeader.numStrips;
 		const vertsPerCell = 4;
 		const channelsPerVert = 3;
-		const channelsPerUv = 3;
+		const channelsPerUv = 2;
+		const channelsPerParam = 2;
 		const indicesPerCell = 6;
 
 		let verts = new Int16Array(numCells * vertsPerCell * channelsPerVert);
 		let colors = new Uint32Array(numCells * vertsPerCell);
 		let uvs = new Uint8Array(numCells * vertsPerCell * channelsPerUv);
+		let params = new Uint8Array(numCells * vertsPerCell * channelsPerParam);
 		let indices = new Uint16Array(numCells * indicesPerCell);
 		let vertIdx = 0;
 		let colIdx = 0;
 		let uvIdx = 0;
+		let paramIdx = 0;
 		let idxIdx = 0;
 		for (let strip = 0; strip < lvl.lvlHeader.numStrips; ++strip) {
 			const s0 = strip;
@@ -199,7 +221,8 @@ class EnvironmentData {
 					colors[colIdx++] = color;
 					uvs[uvIdx++] = quad.uvs[3].u;
 					uvs[uvIdx++] = quad.uvs[3].v;
-					uvs[uvIdx++] = quad.flags;
+					params[paramIdx++] = quadIdx;
+					params[paramIdx++] = quad.flags;
 
 					verts[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].x;
 					verts[vertIdx++] = lvl.vertexTable[s0 * 13 + x1].y;
@@ -207,7 +230,8 @@ class EnvironmentData {
 					colors[colIdx++] = color;
 					uvs[uvIdx++] = quad.uvs[2].u;
 					uvs[uvIdx++] = quad.uvs[2].v;
-					uvs[uvIdx++] = quad.flags;
+					params[paramIdx++] = quadIdx;
+					params[paramIdx++] = quad.flags;
 
 					verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].x;
 					verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x0].y;
@@ -215,7 +239,8 @@ class EnvironmentData {
 					colors[colIdx++] = color;
 					uvs[uvIdx++] = quad.uvs[0].u;
 					uvs[uvIdx++] = quad.uvs[0].v;
-					uvs[uvIdx++] = quad.flags;
+					params[paramIdx++] = quadIdx;
+					params[paramIdx++] = quad.flags;
 
 					verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].x;
 					verts[vertIdx++] = lvl.vertexTable[s1 * 13 + x1].y;
@@ -223,7 +248,8 @@ class EnvironmentData {
 					colors[colIdx++] = color;
 					uvs[uvIdx++] = quad.uvs[1].u;
 					uvs[uvIdx++] = quad.uvs[1].v;
-					uvs[uvIdx++] = quad.flags;
+					params[paramIdx++] = quadIdx;
+					params[paramIdx++] = quad.flags;
 				}
 			}
 		}
@@ -233,6 +259,7 @@ class EnvironmentData {
 			new ArrayBufferSlice(verts.buffer),
 			new ArrayBufferSlice(colors.buffer),
 			new ArrayBufferSlice(uvs.buffer),
+			new ArrayBufferSlice(params.buffer),
 			indices);
 	}
 
@@ -247,8 +274,15 @@ class EnvironmentInstance {
 	private textureMapping = nArray(3, () => new TextureMapping());
 	private megaState: Partial<GfxMegaStateDescriptor> = {};
 	private sortKey: number = 0;
+	private texScrollTable: number[] = [];
 
-	constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, public environmentData: EnvironmentData) {
+	constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, public environmentData: EnvironmentData, texScroll: Uint8Array) {
+		let currTexScrollValue = 0;
+		for (let i = 0; i < texScroll.byteLength && texScroll[i] != 0x80; ++i) {
+			this.texScrollTable.push(currTexScrollValue);
+			currTexScrollValue += texScroll[i];
+		}
+
 		this.program = new EnvironmentProgram();
 
 		const gfxSampler = cache.createSampler({
@@ -278,6 +312,11 @@ class EnvironmentInstance {
 		this.megaState.cullMode = GfxCullMode.Back;
 	}
 
+	private getTexScrollDistance(time: number): number {
+		time *= 20/1000; // 20fps
+		return this.texScrollTable[Math.floor(time % this.texScrollTable.length)];
+	}
+
 	public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput) {
 		const environmentBuffers = this.environmentData.buffers;
 
@@ -297,19 +336,13 @@ class EnvironmentInstance {
 		//const depth = computeViewSpaceDepthFromWorldSpaceAABB(viewerInput.camera.viewMatrix, scratchAABB);
 		//renderInst.sortKey = setSortKeyDepth(renderInst.sortKey, depth);
 
-		let offs = renderInst.allocateUniformBuffer(EnvironmentProgram.ub_MeshFragParams, 12);
+		let offs = renderInst.allocateUniformBuffer(EnvironmentProgram.ub_MeshFragParams, 16);
 		const d = renderInst.mapUniformBufferF32(EnvironmentProgram.ub_MeshFragParams);
 
 		// no model matrix so modelview is just view
 		offs += fillMatrix4x3(d, offs, viewerInput.camera.viewMatrix);
 
-		//offs += fillVec4v(d, offs, meshFrag.materialColor);
-
-		//const time = viewerInput.time / 4000;
-		//const texCoordTransVel = meshFrag.texCoordTransVel;
-		//const texCoordTransX = texCoordTransVel[0] * time;
-		//const texCoordTransY = texCoordTransVel[1] * time;
-		//offs += fillVec4(d, offs, texCoordTransX, texCoordTransY);
+		offs += fillVec4v(d, offs, vec4.fromValues(this.getTexScrollDistance(viewerInput.time),0,0,0));
 
 		renderInstManager.submitRenderInst(renderInst);
 	}
@@ -325,9 +358,9 @@ export class EnvironmentRenderer {
 
 	private environmentInstance: EnvironmentInstance;
 
-	constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, lvl: AsterixLvl) {
+	constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, lvl: AsterixLvl, texScroll: ArrayBufferSlice) {
 		const environmentData = new EnvironmentData(cache.device, lvl);
-		this.environmentInstance = new EnvironmentInstance(cache, textureHolder, environmentData);
+		this.environmentInstance = new EnvironmentInstance(cache, textureHolder, environmentData, texScroll.createTypedArray(Uint8Array));
 	}
 
 	public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput): void {
