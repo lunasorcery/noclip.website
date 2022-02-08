@@ -197,9 +197,6 @@ class BillboardInstance {
         renderInst.setMegaStateFlags(this.megaState);
 
         renderInst.sortKey = this.sortKey;
-        //scratchAABB.transform(meshFrag.bbox, modelMatrix);
-        //const depth = computeViewSpaceDepthFromWorldSpaceAABB(viewerInput.camera.viewMatrix, scratchAABB);
-        //renderInst.sortKey = setSortKeyDepth(renderInst.sortKey, depth);
 
         let offs = renderInst.allocateUniformBuffer(BillboardProgram.ub_MeshFragParams, 20);
         const d = renderInst.mapUniformBufferF32(BillboardProgram.ub_MeshFragParams);
@@ -212,12 +209,6 @@ class BillboardInstance {
 
         // size
         offs += fillVec3v(d, offs, this.billboardData.size);
-
-        //const time = viewerInput.time / 4000;
-        //const texCoordTransVel = meshFrag.texCoordTransVel;
-        //const texCoordTransX = texCoordTransVel[0] * time;
-        //const texCoordTransY = texCoordTransVel[1] * time;
-        //offs += fillVec4(d, offs, texCoordTransX, texCoordTransY);
 
         renderInstManager.submitRenderInst(renderInst);
     }
