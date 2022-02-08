@@ -64,17 +64,23 @@ void main() {
 void main() {
     vec4 t_Color = vec4(1.0);
 
-    const int FLAG_RENDER  = 0x01;
-    const int FLAG_TEXTURE = 0x02;
-
     int quadIdx = v_Params.x;
     int polyFlags = v_Params.y;
+    int polyType = polyFlags & 0xF;
 
-    if ((polyFlags & FLAG_RENDER) == 0)
+    const int TYPE_INVISIBLE = 0;
+    const int TYPE_COLORED   = 1;
+    const int TYPE_TEXTURE   = 3;
+
+    if (polyType == TYPE_INVISIBLE)
     {
         discard;
     }
-    else if ((polyFlags & FLAG_TEXTURE) != 0)
+    else if (polyType == TYPE_COLORED)
+    {
+        t_Color.rgb = v_Color.rgb;
+    }
+    else if (polyType == TYPE_TEXTURE)
     {
         int texId = polyFlags >> 4;
         vec2 texCoord = v_TexCoord;
@@ -92,7 +98,7 @@ void main() {
     }
     else
     {
-        t_Color.rgb = v_Color.rgb;
+        t_Color.rgb = vec3(1,0,1);
     }
 
     gl_FragColor = t_Color;
