@@ -1,17 +1,15 @@
 
 import { TextureMapping } from "../TextureHolder";
 import { AsterixLvl, AsterixTriModel, AsterixObjectType, AsterixObjSolidModel, AsterixObjIntangibleModel, AsterixObjTrampoline, AsterixObjElevator, AsterixObjCrate } from "./lvl";
-import { GfxDevice, GfxFormat, GfxBufferUsage, GfxBuffer, GfxVertexAttributeDescriptor, GfxVertexBufferFrequency, GfxInputLayout, GfxInputState, GfxVertexBufferDescriptor, GfxBufferFrequencyHint, GfxBindingLayoutDescriptor, GfxProgram, GfxSampler, GfxTexFilterMode, GfxMipFilterMode, GfxWrapMode, GfxTextureDimension, GfxRenderPass, GfxIndexBufferDescriptor, GfxInputLayoutBufferDescriptor, makeTextureDescriptor2D, GfxMegaStateDescriptor, GfxBlendMode, GfxBlendFactor, GfxCullMode, GfxFrontFaceMode } from "../gfx/platform/GfxPlatform";
+import { GfxDevice, GfxFormat, GfxBufferUsage, GfxBuffer, GfxVertexAttributeDescriptor, GfxVertexBufferFrequency, GfxInputLayout, GfxInputState, GfxVertexBufferDescriptor, GfxBindingLayoutDescriptor, GfxProgram, GfxTexFilterMode, GfxMipFilterMode, GfxWrapMode, GfxIndexBufferDescriptor, GfxInputLayoutBufferDescriptor, GfxMegaStateDescriptor, GfxCullMode, GfxFrontFaceMode } from "../gfx/platform/GfxPlatform";
 import * as Viewer from "../viewer";
 import { makeStaticDataBuffer, makeStaticDataBufferFromSlice } from "../gfx/helpers/BufferHelpers";
 import { DeviceProgram } from "../Program";
 import { filterDegenerateTriangleIndexBuffer } from "../gfx/helpers/TopologyHelpers";
 import { fillMatrix4x3, fillMatrix4x4 } from "../gfx/helpers/UniformBufferHelpers";
-import { mat4, ReadonlyMat4, vec2, vec3, vec4 } from "gl-matrix";
-import { computeViewSpaceDepthFromWorldSpaceAABB } from "../Camera";
 import ArrayBufferSlice from "../ArrayBufferSlice";
-import { nArray, assertExists, assert } from "../util";
-import { GfxRendererLayer, GfxRenderInstManager, makeSortKey, setSortKeyDepth } from "../gfx/render/GfxRenderInstManager";
+import { nArray } from "../util";
+import { GfxRendererLayer, GfxRenderInstManager, makeSortKey } from "../gfx/render/GfxRenderInstManager";
 import { GfxRenderCache } from "../gfx/render/GfxRenderCache";
 import {AsterixTextureHolder} from "./render";
 import {decodeBGR555} from "./gba_common";
@@ -290,7 +288,7 @@ class TriModelInstance {
         this.megaState.cullMode = GfxCullMode.Back;
     }
 
-    public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, modelMatrix: ReadonlyMat4, viewerInput: Viewer.ViewerRenderInput) {
+    public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput) {
         const triModelBuffers = this.triModelData.buffers;
 
         const renderInst = renderInstManager.newRenderInst();
@@ -305,24 +303,12 @@ class TriModelInstance {
         renderInst.setMegaStateFlags(this.megaState);
 
         renderInst.sortKey = this.sortKey;
-        //scratchAABB.transform(meshFrag.bbox, modelMatrix);
-        //const depth = computeViewSpaceDepthFromWorldSpaceAABB(viewerInput.camera.viewMatrix, scratchAABB);
-        //renderInst.sortKey = setSortKeyDepth(renderInst.sortKey, depth);
 
         let offs = renderInst.allocateUniformBuffer(TriModelProgram.ub_MeshFragParams, 12);
         const d = renderInst.mapUniformBufferF32(TriModelProgram.ub_MeshFragParams);
 
-		let matModelView = mat4.create();
-        mat4.mul(matModelView, viewerInput.camera.viewMatrix, modelMatrix);
-        offs += fillMatrix4x3(d, offs, matModelView);
-
-        //offs += fillVec4v(d, offs, meshFrag.materialColor);
-
-        //const time = viewerInput.time / 4000;
-        //const texCoordTransVel = meshFrag.texCoordTransVel;
-        //const texCoordTransX = texCoordTransVel[0] * time;
-        //const texCoordTransY = texCoordTransVel[1] * time;
-        //offs += fillVec4(d, offs, texCoordTransX, texCoordTransY);
+        // no model matrix so modelview is just view
+        offs += fillMatrix4x3(d, offs, viewerInput.camera.viewMatrix);
 
         renderInstManager.submitRenderInst(renderInst);
     }
@@ -388,7 +374,7 @@ export class TriModelsRenderer {
 		offs += fillMatrix4x4(sceneParamsMapped, offs, viewerInput.camera.projectionMatrix);
 
         for (let i = 0; i < this.triModelInstances.length; ++i) {
-            this.triModelInstances[i].prepareToRender(device, renderInstManager, mat4.create(), viewerInput);
+            this.triModelInstances[i].prepareToRender(device, renderInstManager, viewerInput);
         }
         renderInstManager.popTemplateRenderInst();
     }

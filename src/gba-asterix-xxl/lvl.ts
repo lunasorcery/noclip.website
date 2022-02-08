@@ -12,7 +12,11 @@ interface AsterixUv {
 }
 
 interface AsterixTextureQuad {
-    flags: number;
+    flags: number; // bits 0-3: polygon type:
+                   //           0: invisible
+                   //           1: colored
+                   //           3: textured
+                   // bits 4-7: texture index
     uvs: AsterixUv[];
 }
 
@@ -41,7 +45,12 @@ interface AsterixCollisionSpan {
 
 interface AsterixTriPoly {
     indices: number[],
-    flags: number,
+    flags: number, // bits 0-3: polygon type:
+                   //           0: invisible
+                   //           1: colored
+                   //           3: textured (1px)
+                   //           4: textured (2px)
+                   // bits 4-7: texture index
     uvs: AsterixUv[],
 }
 

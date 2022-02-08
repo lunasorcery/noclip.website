@@ -6,7 +6,6 @@ import * as Viewer from "../viewer";
 import { surfaceToCanvas } from "../Common/bc_texture";
 import ArrayBufferSlice from "../ArrayBufferSlice";
 import { GfxRenderHelper } from "../gfx/render/GfxRenderHelper";
-import { assertExists, assert } from "../util";
 import { makeBackbufferDescSimple, pushAntialiasingPostProcessPass, standardFullClearRenderPassDescriptor } from "../gfx/helpers/RenderGraphHelpers";
 import { GfxRenderInstManager } from "../gfx/render/GfxRenderInstManager";
 import { GfxrAttachmentSlot } from '../gfx/render/GfxRenderGraph';

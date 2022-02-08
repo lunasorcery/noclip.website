@@ -5,7 +5,7 @@ import { DataFetcher } from '../DataFetcher';
 import * as LVL from './lvl';
 import { AsterixRenderer, SceneRenderer } from './render';
 import { SceneContext } from '../SceneBase';
-import { assert, assertExists } from '../util';
+import { assert } from '../util';
 import ArrayBufferSlice from '../ArrayBufferSlice';
 
 class AsterixSceneDesc implements Viewer.SceneDesc {
