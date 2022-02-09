@@ -14,6 +14,7 @@ import { decodeTextureData } from "./gba_common";
 import { TriModelsRenderer } from "./render_trimodel";
 import { EnvironmentRenderer } from "./render_environment";
 import { BillboardsRenderer } from "./render_billboard";
+import { DebugRenderer } from "./render_obj_debug";
 
 export interface AsterixTexture {
     name: string;
@@ -55,23 +56,27 @@ export class SceneRenderer {
     private environmentRenderer: EnvironmentRenderer;
     private triModelsRenderer: TriModelsRenderer;
     private billboardsRenderer: BillboardsRenderer;
+    private debugRenderer: DebugRenderer;
 
     constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, lvl: AsterixLvl, tex_scroll: ArrayBufferSlice) {
         this.environmentRenderer = new EnvironmentRenderer(cache, textureHolder, lvl, tex_scroll);
         this.triModelsRenderer = new TriModelsRenderer(cache, textureHolder, lvl);
         this.billboardsRenderer = new BillboardsRenderer(cache, textureHolder, lvl);
+        this.debugRenderer = new DebugRenderer(cache, textureHolder, lvl);
     }
 
     public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput): void {
         this.environmentRenderer.prepareToRender(device, renderInstManager, viewerInput);
         this.triModelsRenderer.prepareToRender(device, renderInstManager, viewerInput);
         this.billboardsRenderer.prepareToRender(device, renderInstManager, viewerInput);
+        this.debugRenderer.prepareToRender(device, renderInstManager, viewerInput);
     }
 
     public destroy(device: GfxDevice): void {
         this.environmentRenderer.destroy(device);
         this.triModelsRenderer.destroy(device);
         this.billboardsRenderer.destroy(device);
+        this.debugRenderer.destroy(device);
     }
 }
 
