@@ -621,15 +621,21 @@ function readAsterixObjectPayload(stream: DataStream): AsterixObject | null {
     }
 }
 
-function readAsterixGenericObjects(stream: DataStream, offsets: number[]): AsterixGenericObject[] {
+function readAsterixGenericObjects(stream: DataStream, offsets: number[], version: Version): AsterixGenericObject[] {
     let objects: AsterixGenericObject[] = [];
     let base_addr = stream.offs;
     for (let i = 0; i < offsets.length; ++i) {
         let curr_offset = offsets[i];
         while (curr_offset != -1) {
-            stream.offs = base_addr + curr_offset - 8; // maybe make a seek function
-            let preamble_pos = readAsterixVertex(stream);
-            let preamble_unk = stream.readInt16();
+            stream.offs = base_addr + curr_offset;
+            let preamble_pos: AsterixVertex = { x: 0, y: 0, z: 0 };
+            let preamble_unk: number = 0;
+            if (version == Version.Retail) {
+                // preamble only seems to exist in retail format
+                stream.offs -= 8;
+                preamble_pos = readAsterixVertex(stream);
+                preamble_unk = stream.readInt16();
+            }
             let next_offset = stream.readInt16();
             let payload = readAsterixObjectPayload(stream);
             let object: AsterixGenericObject = { preamble_pos, preamble_unk, payload };
@@ -651,7 +657,7 @@ export function parse(buffer: ArrayBufferSlice, version: Version): AsterixLvl {
     const collisionSpans0 = readAsterixCollisionSpanTable(stream, lvlHeader);
     const collisionSpans1 = readAsterixCollisionSpanTable(stream, lvlHeader);
     const objectOffsets = readAsterixObjectOffsets(stream, lvlHeader);
-    const objects = readAsterixGenericObjects(stream, objectOffsets);
+    const objects = readAsterixGenericObjects(stream, objectOffsets, version);
 
     return { palette, textureQuads, lvlHeader, vertexTable, materialAttrs, collisionSpans0, collisionSpans1, objectOffsets, objects };
 }
