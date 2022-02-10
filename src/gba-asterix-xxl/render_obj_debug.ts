@@ -172,6 +172,7 @@ export class DebugRenderer {
                     case AsterixObjectType.SolidModel: break;
                     case AsterixObjectType.IntangibleModel: break;
                     case AsterixObjectType.StaticBillboard: break;
+                    case AsterixObjectType.PushableBox: break;
                     case AsterixObjectType.Trampoline: break;
                     case AsterixObjectType.Elevator: break;
                     case AsterixObjectType.Crate: break;
