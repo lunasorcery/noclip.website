@@ -121,8 +121,7 @@ class DebugInstance {
 
         this.sortKey = makeSortKey(GfxRendererLayer.OPAQUE);
 
-        this.megaState.frontFace = GfxFrontFaceMode.CW;
-        this.megaState.cullMode = GfxCullMode.Back;
+        this.megaState.cullMode = GfxCullMode.None;
     }
 
     public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput, gfxBuffers: DebugGfxBuffers) {
@@ -191,26 +190,54 @@ export class DebugRenderer {
     }
 
     private buildGfxBuffers(device: GfxDevice) {
-        let verts = new Float32Array(12);
+        let verts = new Float32Array(3*8*2);
+        let colors = new Uint32Array(8*2);
+        
         let vertIdx = 0;
-        verts[vertIdx++] = -20; verts[vertIdx++] = -20; verts[vertIdx++] = -20;
-        verts[vertIdx++] = -20; verts[vertIdx++] = +20; verts[vertIdx++] = +20;
-        verts[vertIdx++] = +20; verts[vertIdx++] = -20; verts[vertIdx++] = +20;
-        verts[vertIdx++] = +20; verts[vertIdx++] = +20; verts[vertIdx++] = -20;
-
-        let colors = new Uint32Array(4);
         let colorIdx = 0;
-        colors[colorIdx++] = 0xff0000ff;
-        colors[colorIdx++] = 0xff00ffff;
-        colors[colorIdx++] = 0xff00ff00;
-        colors[colorIdx++] = 0xffff0000;
+        for (let i = 0; i < 2; ++i) {
+            const dist = (i==0) ? 20 : 16;
+            for (let j=0;j<8;++j) {
+                const x = ((j&1)==0) ? -dist : dist;
+                const y = ((j&2)==0) ? -dist : dist;
+                const z = ((j&4)==0) ? -dist : dist;
+                verts[vertIdx++] = x;
+                verts[vertIdx++] = y;
+                verts[vertIdx++] = z;
 
-        let indices = new Uint16Array(12);
+                const color = (i==0) ? 0xff0000ff : 0xff000077;
+                colors[colorIdx++] = color;
+            }
+        }
+
+        let indices = new Uint16Array(6*12);
         let idxIdx = 0;
-        indices[idxIdx++] = 0; indices[idxIdx++] = 1; indices[idxIdx++] = 2;
-        indices[idxIdx++] = 2; indices[idxIdx++] = 1; indices[idxIdx++] = 3;
-        indices[idxIdx++] = 3; indices[idxIdx++] = 1; indices[idxIdx++] = 0;
-        indices[idxIdx++] = 0; indices[idxIdx++] = 2; indices[idxIdx++] = 3;
+        for (let i = 0; i < 8; ++i) { // for each corner of the cube
+            if ((i&1) == 0) { // if its x component is low, connect it to the high-x neighbor
+                indices[idxIdx++] = i;
+                indices[idxIdx++] = i|8;
+                indices[idxIdx++] = i|1;
+                indices[idxIdx++] = i|1;
+                indices[idxIdx++] = i|8;
+                indices[idxIdx++] = i|1|8;
+            }
+            if ((i&2) == 0) { // if its y component is low, connect it to the high-y neighbor
+                indices[idxIdx++] = i;
+                indices[idxIdx++] = i|8;
+                indices[idxIdx++] = i|2;
+                indices[idxIdx++] = i|2;
+                indices[idxIdx++] = i|8;
+                indices[idxIdx++] = i|2|8;
+            }
+            if ((i&4) == 0) { // if its z component is low, connect it to the high-z neighbor
+                indices[idxIdx++] = i;
+                indices[idxIdx++] = i|8;
+                indices[idxIdx++] = i|4;
+                indices[idxIdx++] = i|4;
+                indices[idxIdx++] = i|8;
+                indices[idxIdx++] = i|4|8;
+            }
+        }
 
         this.gfxBuffers = new DebugGfxBuffers(
             device,
