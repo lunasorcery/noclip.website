@@ -6,9 +6,9 @@ import * as Viewer from "../viewer";
 import { surfaceToCanvas } from "../Common/bc_texture";
 import ArrayBufferSlice from "../ArrayBufferSlice";
 import { GfxRenderHelper } from "../gfx/render/GfxRenderHelper";
-import { makeBackbufferDescSimple, pushAntialiasingPostProcessPass, standardFullClearRenderPassDescriptor } from "../gfx/helpers/RenderGraphHelpers";
+import { GfxrAttachmentClearDescriptor, makeBackbufferDescSimple, pushAntialiasingPostProcessPass, setBackbufferDescSimple, standardFullClearRenderPassDescriptor } from "../gfx/helpers/RenderGraphHelpers";
 import { GfxRenderInstManager } from "../gfx/render/GfxRenderInstManager";
-import { GfxrAttachmentSlot } from '../gfx/render/GfxRenderGraph';
+import { GfxrAttachmentSlot, GfxrRenderTargetDescription } from '../gfx/render/GfxRenderGraph';
 import { GfxRenderCache } from "../gfx/render/GfxRenderCache";
 import { decodeTextureData } from "./gba_common";
 import { TriModelsRenderer } from "./render_trimodel";
@@ -117,12 +117,26 @@ export class AsterixRenderer {
         this.renderHelper.prepareToRender();
     }
 
+    private makeDepthStencilDesc(renderInput: Viewer.ViewerRenderInput, clearDescriptor: GfxrAttachmentClearDescriptor): GfxrRenderTargetDescription {
+        const desc = new GfxrRenderTargetDescription(GfxFormat.D24_S8);
+
+        setBackbufferDescSimple(desc, renderInput);
+
+        if (clearDescriptor !== null) {
+            desc.colorClearColor = clearDescriptor.colorClearColor;
+            desc.depthClearValue = clearDescriptor.depthClearValue;
+            desc.stencilClearValue = clearDescriptor.stencilClearValue;
+        }
+
+        return desc;
+    }
+
     public render(device: GfxDevice, viewerInput: Viewer.ViewerRenderInput) {
         const renderInstManager = this.renderHelper.renderInstManager;
         const builder = this.renderHelper.renderGraph.newGraphBuilder();
 
         const mainColorDesc = makeBackbufferDescSimple(GfxrAttachmentSlot.Color0, viewerInput, this.clearRenderPassDescriptor);
-        const mainDepthDesc = makeBackbufferDescSimple(GfxrAttachmentSlot.DepthStencil, viewerInput, this.clearRenderPassDescriptor);
+        const mainDepthDesc = this.makeDepthStencilDesc(viewerInput, this.clearRenderPassDescriptor);
 
         const mainColorTargetID = builder.createRenderTargetID(mainColorDesc, 'Main Color');
         const mainDepthTargetID = builder.createRenderTargetID(mainDepthDesc, 'Main Depth');
@@ -131,6 +145,7 @@ export class AsterixRenderer {
             pass.attachRenderTargetID(GfxrAttachmentSlot.Color0, mainColorTargetID);
             pass.attachRenderTargetID(GfxrAttachmentSlot.DepthStencil, mainDepthTargetID);
             pass.exec((passRenderer) => {
+                passRenderer.setStencilRef(0);
                 renderInstManager.drawOnPassRenderer(passRenderer);
             });
         });
