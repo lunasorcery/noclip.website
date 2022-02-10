@@ -118,7 +118,10 @@ export interface AsterixObjPushableBox {
     xz_bounds_1: AsterixAlignedBounds,
     extra_verts: AsterixVertex[], // [8]
     xz_bounds_2: AsterixAlignedBounds,
-    extra_xz_values: AsterixUnalignedBounds,
+    unk2: number,
+    unk3: number,
+    range_start: AsterixVertex,
+    range_end: AsterixVertex,
 }
 
 export interface AsterixObjTrampoline {
@@ -441,7 +444,10 @@ function readAsterixObjPushableBox(stream: DataStream): AsterixObjPushableBox {
         readAsterixVertex(stream),
     ];
     const xz_bounds_2 = readAsterixAlignedBounds(stream);
-    const extra_xz_values = readAsterixUnalignedBounds(stream);
+    const unk2 = stream.readUint16();
+    const unk3 = stream.readUint16();
+    const range_start = readAsterixVertex(stream);
+    const range_end = readAsterixVertex(stream);
 
     return {
         type: AsterixObjectType.PushableBox,
@@ -450,7 +456,10 @@ function readAsterixObjPushableBox(stream: DataStream): AsterixObjPushableBox {
         xz_bounds_1,
         extra_verts,
         xz_bounds_2,
-        extra_xz_values
+        unk2,
+        unk3,
+        range_start,
+        range_end
     };
 }
 
