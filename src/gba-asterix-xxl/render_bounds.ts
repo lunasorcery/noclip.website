@@ -1,5 +1,5 @@
 
-import { AsterixLvl, AsterixObjectType, AsterixObjSolidModel, AsterixObjIntangibleModel, AsterixObjTrampoline, AsterixObjElevator, AsterixObjCrate, AsterixXZ, AsterixAlignedBounds, AsterixUnalignedBounds } from "./lvl";
+import { AsterixLvl, AsterixObjectType, AsterixObjSolidModel, AsterixObjIntangibleModel, AsterixObjPushableBox, AsterixObjTrampoline, AsterixObjElevator, AsterixObjCrate, AsterixXZ, AsterixAlignedBounds, AsterixUnalignedBounds } from "./lvl";
 import { GfxDevice, GfxFormat, GfxBufferUsage, GfxBuffer, GfxVertexAttributeDescriptor, GfxVertexBufferFrequency, GfxInputLayout, GfxInputState, GfxVertexBufferDescriptor, GfxBindingLayoutDescriptor, GfxProgram, GfxTexFilterMode, GfxMipFilterMode, GfxWrapMode, GfxIndexBufferDescriptor, GfxInputLayoutBufferDescriptor, GfxMegaStateDescriptor, GfxCullMode, GfxFrontFaceMode, GfxStencilOp, GfxCompareMode, GfxChannelWriteMask, GfxBlendMode, GfxBlendFactor } from "../gfx/platform/GfxPlatform";
 import * as Viewer from "../viewer";
 import { makeStaticDataBuffer, makeStaticDataBufferFromSlice } from "../gfx/helpers/BufferHelpers";
@@ -277,6 +277,12 @@ export class BoundsRenderer {
                         this.addAlignedBounds(cache, textureHolder, objSolidModel.broad_bounds);
                         break;
                     }
+                    case AsterixObjectType.PushableBox: {
+                        const objPushableBox = payload as AsterixObjPushableBox;
+                        this.addAlignedBounds(cache, textureHolder, objPushableBox.xz_bounds_1);
+                        this.addAlignedBounds(cache, textureHolder, objPushableBox.xz_bounds_2);
+                        break;
+                    }
                     case AsterixObjectType.Crate: {
                         const objCrate = payload as AsterixObjCrate;
                         this.addAlignedBounds(cache, textureHolder, objCrate.broad_bounds);
@@ -289,7 +295,7 @@ export class BoundsRenderer {
     }
 
     private addAlignedBounds(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, bounds: AsterixAlignedBounds) {
-        return; // hide big bounds for now
+        //return; // hide big bounds for now
         let unpackedBounds:AsterixXZ[] = [
             { x: bounds.x_min, z: bounds.z_min },
             { x: bounds.x_max, z: bounds.z_min },

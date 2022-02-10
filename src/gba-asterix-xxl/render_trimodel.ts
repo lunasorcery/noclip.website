@@ -1,6 +1,6 @@
 
 import { TextureMapping } from "../TextureHolder";
-import { AsterixLvl, AsterixTriModel, AsterixObjectType, AsterixObjSolidModel, AsterixObjIntangibleModel, AsterixObjTrampoline, AsterixObjElevator, AsterixObjCrate } from "./lvl";
+import { AsterixLvl, AsterixTriModel, AsterixObjectType, AsterixObjSolidModel, AsterixObjIntangibleModel, AsterixObjPushableBox, AsterixObjTrampoline, AsterixObjElevator, AsterixObjCrate } from "./lvl";
 import { GfxDevice, GfxFormat, GfxBufferUsage, GfxBuffer, GfxVertexAttributeDescriptor, GfxVertexBufferFrequency, GfxInputLayout, GfxInputState, GfxVertexBufferDescriptor, GfxBindingLayoutDescriptor, GfxProgram, GfxTexFilterMode, GfxMipFilterMode, GfxWrapMode, GfxIndexBufferDescriptor, GfxInputLayoutBufferDescriptor, GfxMegaStateDescriptor, GfxCullMode, GfxFrontFaceMode } from "../gfx/platform/GfxPlatform";
 import * as Viewer from "../viewer";
 import { makeStaticDataBuffer, makeStaticDataBufferFromSlice } from "../gfx/helpers/BufferHelpers";
@@ -334,6 +334,11 @@ export class TriModelsRenderer {
                     case AsterixObjectType.IntangibleModel: {
                         const objIntangibleModel = payload as AsterixObjIntangibleModel;
                         this.addModelInstance(cache, textureHolder, objIntangibleModel.model, lvl.palette);
+                        break;
+                    }
+                    case AsterixObjectType.PushableBox: {
+                        const objPushableBox = payload as AsterixObjPushableBox;
+                        this.addModelInstance(cache, textureHolder, objPushableBox.model, lvl.palette);
                         break;
                     }
                     case AsterixObjectType.Trampoline: {

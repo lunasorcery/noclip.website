@@ -40,7 +40,14 @@ interface AsterixVertex {
 
 interface AsterixMaterialAttr {
     textureQuadIndex: number;
-    flags: number;
+    flags: number; // bit 0: render quality (0: use 1px quality, 1: use 2px cheap-render path)
+                   // bit 1: player can stand on this
+                   // bit 2: player can swim in this
+                   // bit 3: player will slip off this
+                   // bit 4: camera will point upwards at player
+                   // bit 5: seems to instantly kill the player
+                   // bit 6: used on one side of the first barrier wall in level1?
+                   // bit 7: also used on one side of the first barrier wall in level1, but on the floor
 }
 
 interface AsterixCollisionSpan {
@@ -104,6 +111,19 @@ export interface AsterixObjStaticBillboard {
     billboard: AsterixCommonBillboard,
 }
 
+export interface AsterixObjPushableBox {
+    type: AsterixObjectType,
+    unk1: number,
+    model: AsterixTriModel,
+    xz_bounds_1: AsterixAlignedBounds,
+    extra_verts: AsterixVertex[], // [8]
+    xz_bounds_2: AsterixAlignedBounds,
+    unk2: number,
+    unk3: number,
+    range_start: AsterixVertex,
+    range_end: AsterixVertex,
+}
+
 export interface AsterixObjTrampoline {
     type: AsterixObjectType,
     unk1: number,
@@ -141,6 +161,7 @@ type AsterixObject =
     | AsterixObjSolidModel
     | AsterixObjIntangibleModel
     | AsterixObjStaticBillboard
+    | AsterixObjPushableBox
     | AsterixObjTrampoline
     | AsterixObjElevator
     | AsterixObjCrate;
@@ -179,7 +200,7 @@ export const enum AsterixObjectType {
     Pickup06 = 0x06,
     Pickup07 = 0x07,
     Pickup08 = 0x08,
-    _09 = 0x09,
+    PushableBox = 0x09,
     Trampoline = 0x0A,
     Elevator = 0x0B,
     Button = 0x0C,
@@ -408,6 +429,40 @@ function readAsterixObjStaticBillboard(stream: DataStream): AsterixObjStaticBill
     };
 }
 
+function readAsterixObjPushableBox(stream: DataStream): AsterixObjPushableBox {
+    const unk1 = stream.readUint8();
+    const model = readAsterixTriModel(stream);
+    const xz_bounds_1 = readAsterixAlignedBounds(stream);
+    const extra_verts = [
+        readAsterixVertex(stream),
+        readAsterixVertex(stream),
+        readAsterixVertex(stream),
+        readAsterixVertex(stream),
+        readAsterixVertex(stream),
+        readAsterixVertex(stream),
+        readAsterixVertex(stream),
+        readAsterixVertex(stream),
+    ];
+    const xz_bounds_2 = readAsterixAlignedBounds(stream);
+    const unk2 = stream.readUint16();
+    const unk3 = stream.readUint16();
+    const range_start = readAsterixVertex(stream);
+    const range_end = readAsterixVertex(stream);
+
+    return {
+        type: AsterixObjectType.PushableBox,
+        unk1,
+        model,
+        xz_bounds_1,
+        extra_verts,
+        xz_bounds_2,
+        unk2,
+        unk3,
+        range_start,
+        range_end
+    };
+}
+
 function readAsterixObjTrampoline(stream: DataStream): AsterixObjTrampoline {
     const unk1 = stream.readUint8();
     const model = readAsterixTriModel(stream);
@@ -484,7 +539,8 @@ function readAsterixObjectPayload(stream: DataStream): AsterixObject | null {
         //case 0x06: Pickup06
         //case 0x07: Pickup07
         //case 0x08: Pickup08
-        //case 0x09: _09,
+        case AsterixObjectType.PushableBox:
+            return readAsterixObjPushableBox(stream);
         case AsterixObjectType.Trampoline:
             return readAsterixObjTrampoline(stream);
         case AsterixObjectType.Elevator:

@@ -1,6 +1,6 @@
 
 import { TextureMapping } from "../TextureHolder";
-import { AsterixLvl, AsterixCommonBillboard, AsterixObjectType, AsterixObjStaticBillboard } from "./lvl";
+import { AsterixLvl, AsterixCommonBillboard, AsterixObjectType, AsterixObjStaticBillboard, AsterixObjPushableBox } from "./lvl";
 import { GfxDevice, GfxFormat, GfxBufferUsage, GfxBuffer, GfxVertexAttributeDescriptor, GfxVertexBufferFrequency, GfxInputLayout, GfxInputState, GfxVertexBufferDescriptor, GfxBindingLayoutDescriptor, GfxProgram, GfxTexFilterMode, GfxMipFilterMode, GfxWrapMode, GfxIndexBufferDescriptor, GfxInputLayoutBufferDescriptor, GfxMegaStateDescriptor, GfxCullMode, GfxFrontFaceMode } from "../gfx/platform/GfxPlatform";
 import * as Viewer from "../viewer";
 import { makeStaticDataBuffer, makeStaticDataBufferFromSlice } from "../gfx/helpers/BufferHelpers";
@@ -169,6 +169,7 @@ export class DebugRenderer {
                     case AsterixObjectType.SolidModel: break;
                     case AsterixObjectType.IntangibleModel: break;
                     case AsterixObjectType.StaticBillboard: break;
+                    case AsterixObjectType.PushableBox: break;
                     case AsterixObjectType.Trampoline: break;
                     case AsterixObjectType.Elevator: break;
                     case AsterixObjectType.Crate: break;
