@@ -119,7 +119,7 @@ export interface AsterixObjPushableBox {
     extra_verts: AsterixVertex[], // [8]
     xz_bounds_2: AsterixAlignedBounds,
     unk2: number,
-    unk3: number,
+    distance: number, // distance between range_start and range_end, in [0,0x4000]
     range_start: AsterixVertex,
     range_end: AsterixVertex,
 }
@@ -143,6 +143,19 @@ export interface AsterixObjElevator {
     render_model: AsterixTriModel;
 }
 
+export interface AsterixObjButton {
+    type: AsterixObjectType,
+    state: number, // bits 0-6: number of attachments
+                   // bit 7:    is pressed
+    pressed_model: AsterixTriModel,
+    released_model: AsterixTriModel,
+    attachment_offsets: number[],
+    score_requirement: number,
+    billboard: AsterixCommonBillboard,
+    unk1: number, // definitely read, not sure of purpose
+    unk2: number, // unused?
+}
+
 interface AsterixCrateEmbeddedObject {
     unk1: number,
     angle: number,
@@ -164,6 +177,7 @@ type AsterixObject =
     | AsterixObjPushableBox
     | AsterixObjTrampoline
     | AsterixObjElevator
+    | AsterixObjButton
     | AsterixObjCrate;
 
 interface AsterixGenericObject {
@@ -445,7 +459,7 @@ function readAsterixObjPushableBox(stream: DataStream): AsterixObjPushableBox {
     ];
     const xz_bounds_2 = readAsterixAlignedBounds(stream);
     const unk2 = stream.readUint16();
-    const unk3 = stream.readUint16();
+    const distance = stream.readUint16();
     const range_start = readAsterixVertex(stream);
     const range_end = readAsterixVertex(stream);
 
@@ -457,7 +471,7 @@ function readAsterixObjPushableBox(stream: DataStream): AsterixObjPushableBox {
         extra_verts,
         xz_bounds_2,
         unk2,
-        unk3,
+        distance,
         range_start,
         range_end
     };
@@ -497,6 +511,33 @@ function readAsterixObjElevator(stream: DataStream): AsterixObjElevator {
         unused,
         render_model
     };
+}
+
+function readAsterixObjButton(stream: DataStream): AsterixObjButton {
+    const state = stream.readUint8();
+    const num_attachments = (state & 0x7f);
+    const pressed_model = readAsterixTriModel(stream);
+    const released_model = readAsterixTriModel(stream);
+    let attachment_offsets: number[] = [];
+    for (let i = 0; i < num_attachments; ++i) {
+        attachment_offsets.push(stream.readUint16());
+    }
+    const score_requirement = stream.readUint8();
+    const billboard = readAsterixCommonBillboard(stream);
+    const unk1 = stream.readUint8();
+    const unk2 = stream.readUint8();
+
+    return {
+        type: AsterixObjectType.Button,
+        state,
+        pressed_model,
+        released_model,
+        attachment_offsets,
+        score_requirement,
+        billboard,
+        unk1,
+        unk2
+    }
 }
 
 function readAsterixObjCrate(stream: DataStream): AsterixObjCrate {
@@ -545,7 +586,8 @@ function readAsterixObjectPayload(stream: DataStream): AsterixObject | null {
             return readAsterixObjTrampoline(stream);
         case AsterixObjectType.Elevator:
             return readAsterixObjElevator(stream);
-        //case 0x0C: Button
+        case AsterixObjectType.Button:
+            return readAsterixObjButton(stream);
         //case 0x0D: _0D,
         //case 0x0E: _0E,
         //case 0x0F: _0F,

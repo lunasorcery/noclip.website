@@ -175,6 +175,7 @@ export class DebugRenderer {
                     case AsterixObjectType.PushableBox: break;
                     case AsterixObjectType.Trampoline: break;
                     case AsterixObjectType.Elevator: break;
+                    case AsterixObjectType.Button: break;
                     case AsterixObjectType.Crate: break;
                     default: {
                         this.addDebugModel(cache, textureHolder, posVec);

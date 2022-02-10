@@ -1,6 +1,17 @@
 
 import { TextureMapping } from "../TextureHolder";
-import { AsterixLvl, AsterixTriModel, AsterixObjectType, AsterixObjSolidModel, AsterixObjIntangibleModel, AsterixObjPushableBox, AsterixObjTrampoline, AsterixObjElevator, AsterixObjCrate } from "./lvl";
+import {
+    AsterixLvl,
+    AsterixTriModel,
+    AsterixObjectType,
+    AsterixObjSolidModel,
+    AsterixObjIntangibleModel,
+    AsterixObjPushableBox,
+    AsterixObjTrampoline,
+    AsterixObjElevator,
+    AsterixObjButton,
+    AsterixObjCrate
+} from "./lvl";
 import { GfxDevice, GfxFormat, GfxBufferUsage, GfxBuffer, GfxVertexAttributeDescriptor, GfxVertexBufferFrequency, GfxInputLayout, GfxInputState, GfxVertexBufferDescriptor, GfxBindingLayoutDescriptor, GfxProgram, GfxTexFilterMode, GfxMipFilterMode, GfxWrapMode, GfxIndexBufferDescriptor, GfxInputLayoutBufferDescriptor, GfxMegaStateDescriptor, GfxCullMode, GfxFrontFaceMode } from "../gfx/platform/GfxPlatform";
 import * as Viewer from "../viewer";
 import { makeStaticDataBuffer, makeStaticDataBufferFromSlice } from "../gfx/helpers/BufferHelpers";
@@ -341,6 +352,14 @@ export class TriModelsRenderer {
                     }
                     case AsterixObjectType.PushableBox: {
                         const objPushableBox = payload as AsterixObjPushableBox;
+                        const dx = ((objPushableBox.range_end.x - objPushableBox.range_start.x) * objPushableBox.distance) >> 14;
+                        const dy = ((objPushableBox.range_end.y - objPushableBox.range_start.y) * objPushableBox.distance) >> 14;
+                        const dz = ((objPushableBox.range_end.z - objPushableBox.range_start.z) * objPushableBox.distance) >> 14;
+                        for (let i = 0; i < objPushableBox.model.verts.length; ++i) {
+                            objPushableBox.model.verts[i].x = objPushableBox.extra_verts[i].x + dx;
+                            objPushableBox.model.verts[i].y = objPushableBox.extra_verts[i].y + dy;
+                            objPushableBox.model.verts[i].z = objPushableBox.extra_verts[i].z + dz;
+                        }
                         this.addModelInstance(cache, textureHolder, objPushableBox.model, lvl.palette);
                         break;
                     }
@@ -352,6 +371,15 @@ export class TriModelsRenderer {
                     case AsterixObjectType.Elevator: {
                         const objElevator = payload as AsterixObjElevator;
                         this.addModelInstance(cache, textureHolder, objElevator.render_model, lvl.palette);
+                        break;
+                    }
+                    case AsterixObjectType.Button: {
+                        const objButton = payload as AsterixObjButton;
+                        if ((objButton.state & 0x80) != 0) {
+                            this.addModelInstance(cache, textureHolder, objButton.pressed_model, lvl.palette);
+                        } else {
+                            this.addModelInstance(cache, textureHolder, objButton.released_model, lvl.palette);
+                        }
                         break;
                     }
                     case AsterixObjectType.Crate: {
