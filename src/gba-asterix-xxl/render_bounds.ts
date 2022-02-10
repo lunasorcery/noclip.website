@@ -10,6 +10,7 @@ import ArrayBufferSlice from "../ArrayBufferSlice";
 import { GfxRendererLayer, GfxRenderInstManager, makeSortKey } from "../gfx/render/GfxRenderInstManager";
 import { GfxRenderCache } from "../gfx/render/GfxRenderCache";
 import { AsterixTextureHolder, SORT_KEY_BOUNDS } from "./render";
+import { reverseDepthForCompareMode } from "../gfx/helpers/ReversedDepthHelpers";
 
 class BoundsProgram extends DeviceProgram {
     public static a_Position = 0;
@@ -204,7 +205,7 @@ class BoundsInstance {
             frontFace: GfxFrontFaceMode.CW,
             cullMode: GfxCullMode.Front,
             depthWrite: false,
-            depthCompare: GfxCompareMode.Greater,
+            depthCompare: reverseDepthForCompareMode(GfxCompareMode.Less),
             stencilWrite: true,
             stencilPassOp: GfxStencilOp.IncrementClamp,
             stencilCompare: GfxCompareMode.Always,
@@ -213,7 +214,7 @@ class BoundsInstance {
             frontFace: GfxFrontFaceMode.CW,
             cullMode: GfxCullMode.Back,
             depthWrite: false,
-            depthCompare: GfxCompareMode.Greater,
+            depthCompare: reverseDepthForCompareMode(GfxCompareMode.Less),
             stencilWrite: true,
             stencilPassOp: GfxStencilOp.DecrementClamp,
             stencilCompare: GfxCompareMode.Always,
