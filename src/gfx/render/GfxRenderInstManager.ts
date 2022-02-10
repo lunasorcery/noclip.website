@@ -515,6 +515,8 @@ export class GfxRenderInst {
             device.pipelineForceReady(gfxPipeline);
         }
 
+        passRenderer.setStencilRef(0);
+
         passRenderer.setPipeline(gfxPipeline);
 
         passRenderer.setInputState(this._inputState);

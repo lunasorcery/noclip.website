@@ -12,7 +12,7 @@ import ArrayBufferSlice from "../ArrayBufferSlice";
 import { nArray } from "../util";
 import { GfxRendererLayer, GfxRenderInstManager, makeSortKey, setSortKeyDepth } from "../gfx/render/GfxRenderInstManager";
 import { GfxRenderCache } from "../gfx/render/GfxRenderCache";
-import { AsterixTextureHolder } from "./render";
+import { AsterixTextureHolder, SORT_KEY_PROPS } from "./render";
 
 
 class DebugProgram extends DeviceProgram {
@@ -111,15 +111,12 @@ class DebugInstance {
     private gfxProgram: GfxProgram | null = null;
     private program: DebugProgram;
     private megaState: Partial<GfxMegaStateDescriptor> = {};
-    private sortKey: number = 0;
     private modelMatrix: mat4 = mat4.create();
 
     constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, position: vec3) {
         mat4.fromTranslation(this.modelMatrix, position);
 
         this.program = new DebugProgram();
-
-        this.sortKey = makeSortKey(GfxRendererLayer.OPAQUE);
 
         this.megaState.cullMode = GfxCullMode.None;
     }
@@ -136,7 +133,7 @@ class DebugInstance {
         renderInst.setSamplerBindingsFromTextureMappings([]);
         renderInst.setMegaStateFlags(this.megaState);
 
-        renderInst.sortKey = this.sortKey;
+        renderInst.sortKey = SORT_KEY_PROPS;
 
         let offs = renderInst.allocateUniformBuffer(DebugProgram.ub_MeshFragParams, 20);
         const d = renderInst.mapUniformBufferF32(DebugProgram.ub_MeshFragParams);

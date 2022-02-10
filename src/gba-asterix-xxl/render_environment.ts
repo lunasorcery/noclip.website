@@ -11,7 +11,7 @@ import ArrayBufferSlice from "../ArrayBufferSlice";
 import { nArray } from "../util";
 import { GfxRendererLayer, GfxRenderInstManager, makeSortKey } from "../gfx/render/GfxRenderInstManager";
 import { GfxRenderCache } from "../gfx/render/GfxRenderCache";
-import { AsterixTextureHolder } from "./render";
+import { AsterixTextureHolder, SORT_KEY_ENVIRONMENT } from "./render";
 import { decodeBGR555 } from "./gba_common";
 import { vec4 } from "gl-matrix";
 
@@ -336,7 +336,7 @@ class EnvironmentInstance {
         renderInst.setSamplerBindingsFromTextureMappings(this.textureMapping);
         renderInst.setMegaStateFlags(this.megaState);
 
-        renderInst.sortKey = this.sortKey;
+        renderInst.sortKey = SORT_KEY_ENVIRONMENT;
 
         let offs = renderInst.allocateUniformBuffer(EnvironmentProgram.ub_MeshFragParams, 16);
         const d = renderInst.mapUniformBufferF32(EnvironmentProgram.ub_MeshFragParams);

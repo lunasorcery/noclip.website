@@ -12,7 +12,7 @@ import ArrayBufferSlice from "../ArrayBufferSlice";
 import { nArray } from "../util";
 import { GfxRendererLayer, GfxRenderInstManager, makeSortKey, setSortKeyDepth } from "../gfx/render/GfxRenderInstManager";
 import { GfxRenderCache } from "../gfx/render/GfxRenderCache";
-import { AsterixTextureHolder } from "./render";
+import { AsterixTextureHolder, SORT_KEY_PROPS } from "./render";
 
 
 class BillboardProgram extends DeviceProgram {
@@ -137,7 +137,6 @@ class BillboardInstance {
     private program: BillboardProgram;
     private textureMapping = nArray(1, () => new TextureMapping());
     private megaState: Partial<GfxMegaStateDescriptor> = {};
-    private sortKey: number = 0;
 
     constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, public billboardData: BillboardData) {
         this.program = new BillboardProgram();
@@ -161,8 +160,6 @@ class BillboardInstance {
 
         const textureNames = ['tex0', 'tex1', 'tex2', 'common3', 'common4', 'common5', 'common6'];
         fillTextureReference(this.textureMapping[0], textureNames[billboardData.texId]);
-
-        this.sortKey = makeSortKey(GfxRendererLayer.OPAQUE);
 
         this.megaState.frontFace = GfxFrontFaceMode.CW;
         this.megaState.cullMode = GfxCullMode.Back;
@@ -196,7 +193,7 @@ class BillboardInstance {
         renderInst.setSamplerBindingsFromTextureMappings(this.textureMapping);
         renderInst.setMegaStateFlags(this.megaState);
 
-        renderInst.sortKey = this.sortKey;
+        renderInst.sortKey = SORT_KEY_PROPS;
 
         let offs = renderInst.allocateUniformBuffer(BillboardProgram.ub_MeshFragParams, 20);
         const d = renderInst.mapUniformBufferF32(BillboardProgram.ub_MeshFragParams);

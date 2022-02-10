@@ -539,6 +539,7 @@ class GfxImplP_GL implements GfxSwapChain, GfxDevice {
 
         // We always have depth test enabled.
         gl.enable(gl.DEPTH_TEST);
+        gl.enable(gl.STENCIL_TEST);
 
         this._checkLimits();
         this._checkForBugQuirks();

@@ -11,7 +11,7 @@ import ArrayBufferSlice from "../ArrayBufferSlice";
 import { nArray } from "../util";
 import { GfxRendererLayer, GfxRenderInstManager, makeSortKey } from "../gfx/render/GfxRenderInstManager";
 import { GfxRenderCache } from "../gfx/render/GfxRenderCache";
-import { AsterixTextureHolder } from "./render";
+import { AsterixTextureHolder, SORT_KEY_PROPS } from "./render";
 import { decodeBGR555 } from "./gba_common";
 
 class TriModelProgram extends DeviceProgram {
@@ -256,7 +256,6 @@ class TriModelInstance {
     private program: TriModelProgram;
     private textureMapping = nArray(3, () => new TextureMapping());
     private megaState: Partial<GfxMegaStateDescriptor> = {};
-    private sortKey: number = 0;
 
     constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, public triModelData: TriModelData) {
         this.program = new TriModelProgram();
@@ -282,8 +281,6 @@ class TriModelInstance {
         fillTextureReference(this.textureMapping[1], 'tex1');
         fillTextureReference(this.textureMapping[2], 'tex2');
 
-        this.sortKey = makeSortKey(GfxRendererLayer.OPAQUE);
-
         this.megaState.frontFace = GfxFrontFaceMode.CW;
         this.megaState.cullMode = GfxCullMode.Back;
     }
@@ -302,7 +299,7 @@ class TriModelInstance {
         renderInst.setSamplerBindingsFromTextureMappings(this.textureMapping);
         renderInst.setMegaStateFlags(this.megaState);
 
-        renderInst.sortKey = this.sortKey;
+        renderInst.sortKey = SORT_KEY_PROPS;
 
         let offs = renderInst.allocateUniformBuffer(TriModelProgram.ub_MeshFragParams, 12);
         const d = renderInst.mapUniformBufferF32(TriModelProgram.ub_MeshFragParams);

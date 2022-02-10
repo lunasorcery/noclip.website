@@ -27,6 +27,11 @@ interface AsterixLvlHeader {
     unknown3: number;
 }
 
+export interface AsterixXZ {
+    x: number;
+    z: number;
+}
+
 interface AsterixVertex {
     x: number;
     y: number;
@@ -59,11 +64,15 @@ export interface AsterixTriModel {
     polys: AsterixTriPoly[],
 }
 
-interface AsterixXZBounds {
+export interface AsterixAlignedBounds {
     x_min: number,
     x_max: number,
     z_min: number,
     z_max: number,
+}
+
+export interface AsterixUnalignedBounds {
+    bounds: AsterixXZ[], // [4]
 }
 
 export interface AsterixCommonBillboard {
@@ -81,7 +90,7 @@ export interface AsterixObjSolidModel {
     type: AsterixObjectType,
     unk1: number,
     model: AsterixTriModel,
-    broad_bounds: AsterixXZBounds,
+    broad_bounds: AsterixAlignedBounds,
 }
 
 export interface AsterixObjIntangibleModel {
@@ -99,14 +108,14 @@ export interface AsterixObjTrampoline {
     type: AsterixObjectType,
     unk1: number,
     model: AsterixTriModel,
-    broad_bounds: AsterixXZBounds,
+    broad_bounds: AsterixAlignedBounds,
 }
 
 export interface AsterixObjElevator {
     type: AsterixObjectType,
     state_flags: number;
     dummy_model: AsterixTriModel;
-    broad_bounds: AsterixXZBounds;
+    broad_bounds: AsterixAlignedBounds;
     min_elevation: number;
     max_elevation: number;
     paused: number;
@@ -123,8 +132,8 @@ export interface AsterixObjCrate {
     type: AsterixObjectType,
     unk1: number,
     model: AsterixTriModel,
-    broad_bounds: AsterixXZBounds,
-    extra_xz_values: number[],
+    broad_bounds: AsterixAlignedBounds,
+    extra_xz_values: AsterixUnalignedBounds,
     embedded_items: AsterixCrateEmbeddedObject[],
 }
 
@@ -241,6 +250,12 @@ function readAsterixLvlHeader(stream: DataStream, version: Version): AsterixLvlH
     return { numStrips, unknown1, unknown2, unknown3 };
 }
 
+function readAsterixXZ(stream: DataStream): AsterixXZ {
+    const x = stream.readInt16();
+    const z = stream.readInt16();
+    return { x, z };
+}
+
 function readAsterixVertex(stream: DataStream): AsterixVertex {
     const x = stream.readInt16();
     const y = stream.readInt16();
@@ -327,13 +342,24 @@ function readAsterixTriModel(stream: DataStream): AsterixTriModel {
     return { verts, polys };
 }
 
-function readAsterixXZBounds(stream: DataStream): AsterixXZBounds {
+function readAsterixAlignedBounds(stream: DataStream): AsterixAlignedBounds {
     const x_min = stream.readInt16();
     const x_max = stream.readInt16();
     const z_min = stream.readInt16();
     const z_max = stream.readInt16();
 
     return { x_min, x_max, z_min, z_max };
+}
+
+function readAsterixUnalignedBounds(stream: DataStream): AsterixUnalignedBounds {
+    const bounds = [
+        readAsterixXZ(stream),
+        readAsterixXZ(stream),
+        readAsterixXZ(stream),
+        readAsterixXZ(stream),
+    ];
+
+    return { bounds };
 }
 
 function readAsterixCommonBillboard(stream: DataStream): AsterixCommonBillboard {
@@ -352,7 +378,7 @@ function readAsterixCommonBillboard(stream: DataStream): AsterixCommonBillboard 
 function readAsterixObjSolidModel(stream: DataStream): AsterixObjSolidModel {
     const unk1 = stream.readUint8();
     const model = readAsterixTriModel(stream);
-    const broad_bounds = readAsterixXZBounds(stream);
+    const broad_bounds = readAsterixAlignedBounds(stream);
 
     return {
         type: AsterixObjectType.SolidModel,
@@ -385,7 +411,7 @@ function readAsterixObjStaticBillboard(stream: DataStream): AsterixObjStaticBill
 function readAsterixObjTrampoline(stream: DataStream): AsterixObjTrampoline {
     const unk1 = stream.readUint8();
     const model = readAsterixTriModel(stream);
-    const broad_bounds = readAsterixXZBounds(stream);
+    const broad_bounds = readAsterixAlignedBounds(stream);
 
     return {
         type: AsterixObjectType.Trampoline,
@@ -398,7 +424,7 @@ function readAsterixObjTrampoline(stream: DataStream): AsterixObjTrampoline {
 function readAsterixObjElevator(stream: DataStream): AsterixObjElevator {
     const state_flags = stream.readUint8();
     const dummy_model = readAsterixTriModel(stream);
-    const broad_bounds = readAsterixXZBounds(stream);
+    const broad_bounds = readAsterixAlignedBounds(stream);
     const min_elevation = stream.readInt16();
     const max_elevation = stream.readInt16();
     const paused = stream.readUint8();
@@ -421,17 +447,8 @@ function readAsterixObjElevator(stream: DataStream): AsterixObjElevator {
 function readAsterixObjCrate(stream: DataStream): AsterixObjCrate {
     const unk1 = stream.readUint8();
     const model = readAsterixTriModel(stream);
-    const broad_bounds = readAsterixXZBounds(stream);
-    const extra_xz_values = [
-        stream.readInt16(),
-        stream.readInt16(),
-        stream.readInt16(),
-        stream.readInt16(),
-        stream.readInt16(),
-        stream.readInt16(),
-        stream.readInt16(),
-        stream.readInt16(),
-    ];
+    const broad_bounds = readAsterixAlignedBounds(stream);
+    const extra_xz_values = readAsterixUnalignedBounds(stream);
     const num_embedded_items = stream.readUint16();
     let embedded_items: AsterixCrateEmbeddedObject[] = [];
     // disabled until I write in parsing for types 3-8

@@ -31,7 +31,7 @@ function selectFormatSimple(slot: GfxrAttachmentSlot): GfxFormat {
     if (slot === GfxrAttachmentSlot.Color0)
         return GfxFormat.U8_RGBA_RT;
     else if (slot === GfxrAttachmentSlot.DepthStencil)
-        return GfxFormat.D24;
+        return GfxFormat.D24_S8;
     else
         throw "whoops";
 }
