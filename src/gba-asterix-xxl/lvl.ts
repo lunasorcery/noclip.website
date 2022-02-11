@@ -206,6 +206,16 @@ export interface AsterixObjCrate {
     embedded_items: AsterixCrateEmbeddedObject[],
 }
 
+export interface AsterixObjHintsNpc {
+    type: AsterixObjectType,
+    hint_string_id: number,
+    animation_frame: number,
+    unk1: number,
+    angle: number, // wraps at 0x400
+    pos: AsterixVertex,
+    probably_unaligned_bounds: AsterixUnalignedBounds, // probably
+}
+
 type AsterixObject =
     | AsterixObjSolidModel
     | AsterixObjIntangibleModel
@@ -220,7 +230,8 @@ type AsterixObject =
     | AsterixObjTrampoline
     | AsterixObjElevator
     | AsterixObjButton
-    | AsterixObjCrate;
+    | AsterixObjCrate
+    | AsterixObjHintsNpc;
 
 interface AsterixGenericObject {
     preamble_pos: AsterixVertex;
@@ -683,6 +694,25 @@ function readAsterixObjCrate(stream: DataStream): AsterixObjCrate {
     };
 }
 
+function readAsterixObjHintsNpc(stream: DataStream): AsterixObjHintsNpc {
+    const hint_string_id = stream.readUint8();
+    const animation_frame = stream.readUint8();
+    const unk1 = stream.readUint8();
+    const angle = stream.readUint16();
+    const pos = readAsterixVertex(stream);
+    const probably_unaligned_bounds = readAsterixUnalignedBounds(stream);
+
+    return {
+        type:AsterixObjectType.HintsNpc,
+        hint_string_id,
+        animation_frame,
+        unk1,
+        angle,
+        pos,
+        probably_unaligned_bounds
+    };
+}
+
 function readAsterixObjectPayload(stream: DataStream, version: Version): AsterixObject | null {
     const obj_type = stream.readUint8();
     switch (obj_type) {
@@ -721,7 +751,8 @@ function readAsterixObjectPayload(stream: DataStream, version: Version): Asterix
         //case 0x13: _13,
         case AsterixObjectType.Crate:
             return readAsterixObjCrate(stream);
-        //case 0x15: HintsNpc
+        case AsterixObjectType.HintsNpc:
+            return readAsterixObjHintsNpc(stream);
         //case 0x16: _16,
         //case 0x17: _17,
         //case 0x18: _18,
