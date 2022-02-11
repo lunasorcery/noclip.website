@@ -50,24 +50,24 @@ class AsterixSceneDesc implements Viewer.SceneDesc {
                 this.fetchBBAnim('0846db48', dataFetcher), // 06 Laurel
                 this.fetchBBAnim('0846db88', dataFetcher), // 07 Potion
                 this.fetchBBAnim('0846da48', dataFetcher), // 08 Fire Stick
-                this.fetchBBAnim('0846dbc8', dataFetcher), // ?? Locked Button
+                this.fetchBBAnim('0846dbc8', dataFetcher), //    Locked Button
             ]).then(([
-                animPickup03,
-                animPickup04,
-                animPickup05,
-                animPickup06,
-                animPickup07,
-                animPickup08,
+                animSilverHelmet,
+                animGoldHelmet,
+                animHam,
+                animLaurel,
+                animPotion,
+                animFireStick,
                 animLockedButton,
             ]) => {
                 return {
-                    animSilverHelmet: animPickup03,
-                    animGoldHelmet: animPickup04,
-                    animHam: animPickup05,
-                    animLaurel: animPickup06,
-                    animPotion: animPickup07,
-                    animFireStick: animPickup08,
-                    animLockedButton: animLockedButton,
+                    animSilverHelmet,
+                    animGoldHelmet,
+                    animHam,
+                    animLaurel,
+                    animPotion,
+                    animFireStick,
+                    animLockedButton,
                 };
             });
         } else {
