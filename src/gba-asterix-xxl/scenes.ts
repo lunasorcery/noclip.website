@@ -35,8 +35,10 @@ class AsterixSceneDesc implements Viewer.SceneDesc {
         return dataFetcher.fetchData(`gba-asterix-xxl/${this.folder}/${tex_scroll_id}.texscroll`);
     }
 
-    private fetchBBAnim(bb_anim_id: string, dataFetcher: DataFetcher): Promise<ArrayBufferSlice> {
-        return dataFetcher.fetchData(`gba-asterix-xxl/${this.folder}/${bb_anim_id}.bbanim`);
+    private fetchBBAnim(bb_anim_id: string, dataFetcher: DataFetcher): Promise<BillboardAnim> {
+        return dataFetcher.fetchData(`gba-asterix-xxl/${this.folder}/${bb_anim_id}.bbanim`).then((buffer) => {
+            return parseBillboardAnim(buffer);
+        });
     }
 
     private fetchBBAnims(dataFetcher: DataFetcher): Promise<BillboardAnimSet> {
@@ -59,13 +61,13 @@ class AsterixSceneDesc implements Viewer.SceneDesc {
                 animLockedButton,
             ]) => {
                 return {
-                    animSilverHelmet: parseBillboardAnim(animPickup03),
-                    animGoldHelmet: parseBillboardAnim(animPickup04),
-                    animHam: parseBillboardAnim(animPickup05),
-                    animLaurel: parseBillboardAnim(animPickup06),
-                    animPotion: parseBillboardAnim(animPickup07),
-                    animFireStick: parseBillboardAnim(animPickup08),
-                    animLockedButton: parseBillboardAnim(animLockedButton),
+                    animSilverHelmet: animPickup03,
+                    animGoldHelmet: animPickup04,
+                    animHam: animPickup05,
+                    animLaurel: animPickup06,
+                    animPotion: animPickup07,
+                    animFireStick: animPickup08,
+                    animLockedButton: animLockedButton,
                 };
             });
         } else {
