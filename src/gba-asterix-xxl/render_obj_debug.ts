@@ -170,6 +170,12 @@ export class DebugRenderer {
                     case AsterixObjectType.SolidModel: break;
                     case AsterixObjectType.IntangibleModel: break;
                     case AsterixObjectType.StaticBillboard: break;
+                    case AsterixObjectType.Pickup03: break;
+                    case AsterixObjectType.Pickup04: break;
+                    case AsterixObjectType.Pickup05: break;
+                    case AsterixObjectType.Pickup06: break;
+                    case AsterixObjectType.Pickup07: break;
+                    case AsterixObjectType.Pickup08: break;
                     case AsterixObjectType.PushableBox: break;
                     case AsterixObjectType.Trampoline: break;
                     case AsterixObjectType.Elevator: break;

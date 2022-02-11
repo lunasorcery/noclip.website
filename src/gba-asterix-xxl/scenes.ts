@@ -2,11 +2,12 @@
 import * as Viewer from '../viewer';
 import { GfxDevice } from '../gfx/platform/GfxPlatform';
 import { DataFetcher } from '../DataFetcher';
-import * as LVL from './lvl';
+import { parseLVL, Version, AsterixLvl, BillboardAnim, parseBillboardAnim } from './lvl';
 import { AsterixRenderer, SceneRenderer } from './render';
 import { SceneContext } from '../SceneBase';
 import { assert } from '../util';
 import ArrayBufferSlice from '../ArrayBufferSlice';
+import { BillboardAnimSet } from './render_billboard';
 
 class AsterixSceneDesc implements Viewer.SceneDesc {
     constructor(
@@ -17,35 +18,94 @@ class AsterixSceneDesc implements Viewer.SceneDesc {
         public name: string,
         public common_tex_id: string,
         public folder: string,
-        public version: LVL.Version) {
+        public version: Version) {
     }
 
-    private fetchLvl(folder: string, level_id: string, version: LVL.Version, dataFetcher: DataFetcher): Promise<LVL.AsterixLvl> {
-        return dataFetcher.fetchData(`gba-asterix-xxl/${folder}/${level_id}.lvl`).then((buffer) => {
-            return LVL.parse(buffer, version);
+    private fetchLvl(level_id: string, dataFetcher: DataFetcher): Promise<AsterixLvl> {
+        return dataFetcher.fetchData(`gba-asterix-xxl/${this.folder}/${level_id}.lvl`).then((buffer) => {
+            return parseLVL(buffer, this.version);
         })
     }
 
-    private fetchTex(folder: string, tex_id: string, dataFetcher: DataFetcher): Promise<ArrayBufferSlice> {
-        return dataFetcher.fetchData(`gba-asterix-xxl/${folder}/${tex_id}.tex`);
+    private fetchTex(tex_id: string, dataFetcher: DataFetcher): Promise<ArrayBufferSlice> {
+        return dataFetcher.fetchData(`gba-asterix-xxl/${this.folder}/${tex_id}.tex`);
     }
 
-    private fetchTexScroll(folder: string, tex_scroll_id: string, dataFetcher: DataFetcher): Promise<ArrayBufferSlice> {
-        return dataFetcher.fetchData(`gba-asterix-xxl/${folder}/${tex_scroll_id}.texscroll`);
+    private fetchTexScroll(tex_scroll_id: string, dataFetcher: DataFetcher): Promise<ArrayBufferSlice> {
+        return dataFetcher.fetchData(`gba-asterix-xxl/${this.folder}/${tex_scroll_id}.texscroll`);
+    }
+
+    private fetchBBAnim(bb_anim_id: string, dataFetcher: DataFetcher): Promise<ArrayBufferSlice> {
+        return dataFetcher.fetchData(`gba-asterix-xxl/${this.folder}/${bb_anim_id}.bbanim`);
+    }
+
+    private fetchBBAnims(dataFetcher: DataFetcher): Promise<BillboardAnimSet> {
+        if (this.version == Version.Retail) {
+            return Promise.all([
+                this.fetchBBAnim('0846da88', dataFetcher), // 03 Silver Helmet
+                this.fetchBBAnim('0846dac8', dataFetcher), // 04 Gold Helmet
+                this.fetchBBAnim('0846db08', dataFetcher), // 05 Ham
+                this.fetchBBAnim('0846db48', dataFetcher), // 06 Laurel
+                this.fetchBBAnim('0846db88', dataFetcher), // 07 Potion
+                this.fetchBBAnim('0846da48', dataFetcher), // 08 Fire Stick
+                this.fetchBBAnim('0846dbc8', dataFetcher), // ?? Locked Button
+            ]).then(([
+                animPickup03,
+                animPickup04,
+                animPickup05,
+                animPickup06,
+                animPickup07,
+                animPickup08,
+                animLockedButton,
+            ]) => {
+                return {
+                    animSilverHelmet: parseBillboardAnim(animPickup03),
+                    animGoldHelmet: parseBillboardAnim(animPickup04),
+                    animHam: parseBillboardAnim(animPickup05),
+                    animLaurel: parseBillboardAnim(animPickup06),
+                    animPotion: parseBillboardAnim(animPickup07),
+                    animFireStick: parseBillboardAnim(animPickup08),
+                    animLockedButton: parseBillboardAnim(animLockedButton),
+                };
+            });
+        } else {
+            // TODO: find the billboard anim tables in the prototype builds
+            return Promise.all([]).then(([]) => {
+                const empty_anim: BillboardAnim = {
+                    keyframes: [{
+                        top: 0,
+                        bottom: 0,
+                        left: 0,
+                        right: 0
+                    }]
+                };
+                return {
+                    animSilverHelmet: empty_anim,
+                    animGoldHelmet: empty_anim,
+                    animHam: empty_anim,
+                    animLaurel: empty_anim,
+                    animPotion: empty_anim,
+                    animFireStick: empty_anim,
+                    animLockedButton: empty_anim,
+                };
+            });
+        }
     }
 
     public createScene(device: GfxDevice, context: SceneContext): Promise<Viewer.SceneGfx> {
         const dataFetcher = context.dataFetcher;
         return Promise.all([
-            this.fetchLvl(this.folder, this.level_id, this.version, dataFetcher),
-            this.fetchTex(this.folder, this.area_tex_id, dataFetcher),
-            this.fetchTex(this.folder, this.common_tex_id, dataFetcher),
-            this.fetchTexScroll(this.folder, this.tex_scroll_id, dataFetcher)
+            this.fetchLvl(this.level_id, dataFetcher),
+            this.fetchTex(this.area_tex_id, dataFetcher),
+            this.fetchTex(this.common_tex_id, dataFetcher),
+            this.fetchTexScroll(this.tex_scroll_id, dataFetcher),
+            this.fetchBBAnims(dataFetcher),
         ]).then(([
             lvl,
             area_tex,
             common_tex,
-            tex_scroll
+            tex_scroll,
+            bbanims
         ]) => {
             const renderer = new AsterixRenderer(device);
             {
@@ -61,7 +121,7 @@ class AsterixSceneDesc implements Viewer.SceneDesc {
                     { name: 'common6', width: 256, height: 256, indices: common_tex.slice(0x30000, 0x40000), palette: lvl.palette },
                 ]);
 
-                const sceneRenderer = new SceneRenderer(renderer.cache, renderer.textureHolder, lvl, tex_scroll);
+                const sceneRenderer = new SceneRenderer(renderer.cache, renderer.textureHolder, lvl, tex_scroll, bbanims);
                 renderer.sceneRenderers.push(sceneRenderer);
             }
             return renderer;
@@ -71,19 +131,19 @@ class AsterixSceneDesc implements Viewer.SceneDesc {
 
 class AsterixRetailSceneDesc extends AsterixSceneDesc {
     constructor(id: string, level_id: string, area_tex_id: string, tex_scroll_id: string, name: string) {
-        super(id, level_id, area_tex_id, tex_scroll_id, name, "08010000", "retail", LVL.Version.Retail);
+        super(id, level_id, area_tex_id, tex_scroll_id, name, "08010000", "retail", Version.Retail);
     }
 }
 
 class AsterixProtoASceneDesc extends AsterixSceneDesc {
     constructor(id: string, level_id: string, area_tex_id: string, tex_scroll_id: string, name: string) {
-        super(id, level_id, area_tex_id, tex_scroll_id, name, "087c0000", "proto-a", LVL.Version.PrototypeA);
+        super(id, level_id, area_tex_id, tex_scroll_id, name, "087c0000", "proto-a", Version.PrototypeA);
     }
 }
 
 class AsterixProtoBSceneDesc extends AsterixSceneDesc {
     constructor(id: string, level_id: string, area_tex_id: string, tex_scroll_id: string, name: string) {
-        super(id, level_id, area_tex_id, tex_scroll_id, name, "087c0000", "proto-b", LVL.Version.PrototypeB);
+        super(id, level_id, area_tex_id, tex_scroll_id, name, "087c0000", "proto-b", Version.PrototypeB);
     }
 }
 

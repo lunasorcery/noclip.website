@@ -1,6 +1,6 @@
 
 import { TextureHolder, LoadedTexture } from "../TextureHolder";
-import { AsterixLvl } from "./lvl";
+import { AsterixLvl, BillboardAnim } from "./lvl";
 import { GfxDevice, GfxFormat, makeTextureDescriptor2D } from "../gfx/platform/GfxPlatform";
 import * as Viewer from "../viewer";
 import { surfaceToCanvas } from "../Common/bc_texture";
@@ -13,7 +13,7 @@ import { GfxRenderCache } from "../gfx/render/GfxRenderCache";
 import { decodeTextureData } from "./gba_common";
 import { TriModelsRenderer } from "./render_trimodel";
 import { EnvironmentRenderer } from "./render_environment";
-import { BillboardsRenderer } from "./render_billboard";
+import { BillboardAnimSet, BillboardsRenderer } from "./render_billboard";
 import { DebugRenderer } from "./render_obj_debug";
 
 export interface AsterixTexture {
@@ -58,10 +58,10 @@ export class SceneRenderer {
     private billboardsRenderer: BillboardsRenderer;
     private debugRenderer: DebugRenderer;
 
-    constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, lvl: AsterixLvl, tex_scroll: ArrayBufferSlice) {
+    constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, lvl: AsterixLvl, tex_scroll: ArrayBufferSlice, bbanims: BillboardAnimSet) {
         this.environmentRenderer = new EnvironmentRenderer(cache, textureHolder, lvl, tex_scroll);
         this.triModelsRenderer = new TriModelsRenderer(cache, textureHolder, lvl);
-        this.billboardsRenderer = new BillboardsRenderer(cache, textureHolder, lvl);
+        this.billboardsRenderer = new BillboardsRenderer(cache, textureHolder, lvl, bbanims);
         this.debugRenderer = new DebugRenderer(cache, textureHolder, lvl);
     }
 

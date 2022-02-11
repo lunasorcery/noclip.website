@@ -1,6 +1,21 @@
 
 import { TextureMapping } from "../TextureHolder";
-import { AsterixLvl, AsterixCommonBillboard, AsterixObjectType, AsterixObjStaticBillboard } from "./lvl";
+import {
+    AsterixLvl,
+    AsterixCommonBillboard,
+    AsterixObjectType,
+    AsterixObjStaticBillboard,
+    AsterixObjPickup03,
+    AsterixObjPickup04,
+    AsterixObjPickup05,
+    AsterixObjPickup06,
+    AsterixObjPickup07,
+    AsterixObjPickup08,
+    BillboardAnim,
+    AsterixCommonPickup,
+    BillboardKeyframe,
+    AsterixObjButton
+} from "./lvl";
 import { GfxDevice, GfxFormat, GfxBufferUsage, GfxBuffer, GfxVertexAttributeDescriptor, GfxVertexBufferFrequency, GfxInputLayout, GfxInputState, GfxVertexBufferDescriptor, GfxBindingLayoutDescriptor, GfxProgram, GfxTexFilterMode, GfxMipFilterMode, GfxWrapMode, GfxIndexBufferDescriptor, GfxInputLayoutBufferDescriptor, GfxMegaStateDescriptor, GfxCullMode, GfxFrontFaceMode } from "../gfx/platform/GfxPlatform";
 import * as Viewer from "../viewer";
 import { makeStaticDataBuffer, makeStaticDataBufferFromSlice } from "../gfx/helpers/BufferHelpers";
@@ -14,6 +29,15 @@ import { GfxRendererLayer, GfxRenderInstManager, makeSortKey, setSortKeyDepth } 
 import { GfxRenderCache } from "../gfx/render/GfxRenderCache";
 import { AsterixTextureHolder } from "./render";
 
+export interface BillboardAnimSet {
+    /* 03 */ animSilverHelmet: BillboardAnim,
+    /* 04 */ animGoldHelmet: BillboardAnim,
+    /* 05 */ animHam: BillboardAnim,
+    /* 06 */ animLaurel: BillboardAnim,
+    /* 07 */ animPotion: BillboardAnim,
+    /* 08 */ animFireStick: BillboardAnim,
+    /* .. */ animLockedButton: BillboardAnim,
+}
 
 class BillboardProgram extends DeviceProgram {
     public static a_Position = 0;
@@ -217,6 +241,27 @@ class BillboardInstance {
     }
 }
 
+class PickupInstance extends BillboardInstance {
+    constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, public billboardData: BillboardData, public anim: BillboardAnim) {
+        super(cache, textureHolder, billboardData);)
+    }
+
+    private getKeyframe(time: number): BillboardKeyframe {
+        time *= 20 / 1000; // 20fps
+        return this.anim.keyframes[Math.floor(time % this.anim.keyframes.length)];
+    }
+
+    public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput, gfxBuffers: BillboardGfxBuffers) {
+        const keyframe = this.getKeyframe(viewerInput.time);
+        this.billboardData.texCoords = vec4.fromValues(
+            keyframe.left,
+            keyframe.top,
+            keyframe.right,
+            keyframe.bottom);
+        super.prepareToRender(device, renderInstManager, viewerInput, gfxBuffers);
+    }
+}
+
 export class BillboardsRenderer {
     private static readonly bindingLayouts: GfxBindingLayoutDescriptor[] = [
         { numUniformBuffers: 2, numSamplers: 1 },
@@ -225,7 +270,7 @@ export class BillboardsRenderer {
     public gfxBuffers: BillboardGfxBuffers;
     private billboardInstances: BillboardInstance[] = [];
 
-    constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, lvl: AsterixLvl) {
+    constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, lvl: AsterixLvl, public bbanims: BillboardAnimSet) {
         this.buildGfxBuffers(cache.device);
 
         for (let i = 0; i < lvl.objects.length; ++i) {
@@ -234,7 +279,20 @@ export class BillboardsRenderer {
                 switch (payload.type) {
                     case AsterixObjectType.StaticBillboard: {
                         const objStaticBillboard = payload as AsterixObjStaticBillboard;
-                        this.addBillboard(cache, textureHolder, objStaticBillboard.billboard);
+                        this.addStaticBillboard(cache, textureHolder, objStaticBillboard.billboard);
+                        break;
+                    }
+                    case AsterixObjectType.Pickup03: { this.addPickup(cache, textureHolder, (payload as AsterixObjPickup03).pickup); break; }
+                    case AsterixObjectType.Pickup04: { this.addPickup(cache, textureHolder, (payload as AsterixObjPickup04).pickup); break; }
+                    case AsterixObjectType.Pickup05: { this.addPickup(cache, textureHolder, (payload as AsterixObjPickup05).pickup); break; }
+                    case AsterixObjectType.Pickup06: { this.addPickup(cache, textureHolder, (payload as AsterixObjPickup06).pickup); break; }
+                    case AsterixObjectType.Pickup07: { this.addPickup(cache, textureHolder, (payload as AsterixObjPickup07).pickup); break; }
+                    case AsterixObjectType.Pickup08: { this.addPickup(cache, textureHolder, (payload as AsterixObjPickup08).pickup); break; }
+                    case AsterixObjectType.Button: {
+                        const objButton = payload as AsterixObjButton;
+                        if (objButton.score_requirement > 0) {
+                            this.addAnimatedBillboard(cache, textureHolder, objButton.billboard, bbanims.animLockedButton);
+                        }
                         break;
                     }
                 }
@@ -273,10 +331,30 @@ export class BillboardsRenderer {
             indices);
     }
 
-    private addBillboard(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, billboard: AsterixCommonBillboard) {
-        const billboardData = new BillboardData(cache.device, billboard);
-        const billboardInstance = new BillboardInstance(cache, textureHolder, billboardData);
-        this.billboardInstances.push(billboardInstance);
+    private addStaticBillboard(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, billboard: AsterixCommonBillboard) {
+        const data = new BillboardData(cache.device, billboard);
+        const instance = new BillboardInstance(cache, textureHolder, data);
+        this.billboardInstances.push(instance);
+    }
+
+    private addAnimatedBillboard(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, billboard: AsterixCommonBillboard, anim: BillboardAnim) {
+        const data = new BillboardData(cache.device, billboard);
+        const instance = new PickupInstance(cache, textureHolder, data, anim);
+        this.billboardInstances.push(instance);
+    }
+
+    private addPickup(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, pickup: AsterixCommonPickup) {
+        let anim: BillboardAnim|null = null;
+        switch (pickup.unk_bytes[1]) {
+            case 0x03: anim = this.bbanims.animSilverHelmet; break;
+            case 0x04: anim = this.bbanims.animGoldHelmet; break;
+            case 0x05: anim = this.bbanims.animHam; break;
+            case 0x06: anim = this.bbanims.animLaurel; break;
+            case 0x07: anim = this.bbanims.animPotion; break;
+            case 0x08: anim = this.bbanims.animFireStick; break;
+            default: return;
+        }
+        this.addAnimatedBillboard(cache, textureHolder, pickup.billboard, anim);
     }
 
     public prepareToRender(device: GfxDevice, renderInstManager: GfxRenderInstManager, viewerInput: Viewer.ViewerRenderInput): void {

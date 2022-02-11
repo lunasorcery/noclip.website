@@ -93,6 +93,11 @@ export interface AsterixCommonBillboard {
     bottom: number,
 }
 
+export interface AsterixCommonPickup {
+	billboard: AsterixCommonBillboard,
+	unk_bytes: number[], // [u8;8]
+}
+
 export interface AsterixObjSolidModel {
     type: AsterixObjectType,
     unk1: number,
@@ -109,6 +114,37 @@ export interface AsterixObjIntangibleModel {
 export interface AsterixObjStaticBillboard {
     type: AsterixObjectType,
     billboard: AsterixCommonBillboard,
+}
+
+export interface AsterixObjPickup03 {
+    type: AsterixObjectType,
+    pickup: AsterixCommonPickup,
+}
+
+export interface AsterixObjPickup04 {
+    type: AsterixObjectType,
+    pickup: AsterixCommonPickup,
+}
+
+export interface AsterixObjPickup05 {
+    type: AsterixObjectType,
+    pickup: AsterixCommonPickup,
+}
+
+export interface AsterixObjPickup06 {
+    type: AsterixObjectType,
+    pickup: AsterixCommonPickup,
+    unk1: number,
+}
+
+export interface AsterixObjPickup07 {
+    type: AsterixObjectType,
+    pickup: AsterixCommonPickup,
+}
+
+export interface AsterixObjPickup08 {
+    type: AsterixObjectType,
+    pickup: AsterixCommonPickup,
 }
 
 export interface AsterixObjPushableBox {
@@ -174,6 +210,12 @@ type AsterixObject =
     | AsterixObjSolidModel
     | AsterixObjIntangibleModel
     | AsterixObjStaticBillboard
+    | AsterixObjPickup03
+    | AsterixObjPickup04
+    | AsterixObjPickup05
+    | AsterixObjPickup06
+    | AsterixObjPickup07
+    | AsterixObjPickup08
     | AsterixObjPushableBox
     | AsterixObjTrampoline
     | AsterixObjElevator
@@ -410,6 +452,22 @@ function readAsterixCommonBillboard(stream: DataStream): AsterixCommonBillboard 
     return { tex_id, pos, width, height, left, top, right, bottom };
 }
 
+function readAsterixCommonPickup(stream: DataStream): AsterixCommonPickup {
+    const billboard = readAsterixCommonBillboard(stream);
+    const unk_bytes = [
+        stream.readUint8(),
+        stream.readUint8(),
+        stream.readUint8(),
+        stream.readUint8(),
+        stream.readUint8(),
+        stream.readUint8(),
+        stream.readUint8(),
+        stream.readUint8(),
+    ];
+
+    return { billboard, unk_bytes };
+}
+
 function readAsterixObjSolidModel(stream: DataStream): AsterixObjSolidModel {
     const unk1 = stream.readUint8();
     const model = readAsterixTriModel(stream);
@@ -440,6 +498,62 @@ function readAsterixObjStaticBillboard(stream: DataStream): AsterixObjStaticBill
     return { 
         type: AsterixObjectType.StaticBillboard,
         billboard
+    };
+}
+
+function readAsterixObjPickup03(stream: DataStream): AsterixObjPickup03 {
+    const pickup = readAsterixCommonPickup(stream);
+
+    return { 
+        type: AsterixObjectType.Pickup03,
+        pickup
+    };
+}
+
+function readAsterixObjPickup04(stream: DataStream): AsterixObjPickup04 {
+    const pickup = readAsterixCommonPickup(stream);
+
+    return { 
+        type: AsterixObjectType.Pickup04,
+        pickup
+    };
+}
+
+function readAsterixObjPickup05(stream: DataStream): AsterixObjPickup05 {
+    const pickup = readAsterixCommonPickup(stream);
+
+    return { 
+        type: AsterixObjectType.Pickup05,
+        pickup
+    };
+}
+
+function readAsterixObjPickup06(stream: DataStream): AsterixObjPickup06 {
+    const pickup = readAsterixCommonPickup(stream);
+    const unk1 = stream.readUint16();
+
+    return { 
+        type: AsterixObjectType.Pickup06,
+        pickup,
+        unk1
+    };
+}
+
+function readAsterixObjPickup07(stream: DataStream): AsterixObjPickup07 {
+    const pickup = readAsterixCommonPickup(stream);
+
+    return { 
+        type: AsterixObjectType.Pickup07,
+        pickup
+    };
+}
+
+function readAsterixObjPickup08(stream: DataStream): AsterixObjPickup08 {
+    const pickup = readAsterixCommonPickup(stream);
+
+    return { 
+        type: AsterixObjectType.Pickup08,
+        pickup
     };
 }
 
@@ -513,7 +627,7 @@ function readAsterixObjElevator(stream: DataStream): AsterixObjElevator {
     };
 }
 
-function readAsterixObjButton(stream: DataStream): AsterixObjButton {
+function readAsterixObjButton(stream: DataStream, version: Version): AsterixObjButton {
     const state = stream.readUint8();
     const num_attachments = (state & 0x7f);
     const pressed_model = readAsterixTriModel(stream);
@@ -524,8 +638,12 @@ function readAsterixObjButton(stream: DataStream): AsterixObjButton {
     }
     const score_requirement = stream.readUint8();
     const billboard = readAsterixCommonBillboard(stream);
-    const unk1 = stream.readUint8();
-    const unk2 = stream.readUint8();
+    let unk1 = 0;
+    let unk2 = 0;
+    if (version == Version.Retail) {
+        unk1 = stream.readUint8();
+        unk2 = stream.readUint8();
+    }
 
     return {
         type: AsterixObjectType.Button,
@@ -565,7 +683,7 @@ function readAsterixObjCrate(stream: DataStream): AsterixObjCrate {
     };
 }
 
-function readAsterixObjectPayload(stream: DataStream): AsterixObject | null {
+function readAsterixObjectPayload(stream: DataStream, version: Version): AsterixObject | null {
     const obj_type = stream.readUint8();
     switch (obj_type) {
         case AsterixObjectType.SolidModel:
@@ -574,12 +692,18 @@ function readAsterixObjectPayload(stream: DataStream): AsterixObject | null {
             return readAsterixObjIntangibleModel(stream);
         case AsterixObjectType.StaticBillboard:
             return readAsterixObjStaticBillboard(stream);
-        //case 0x03: Pickup03
-        //case 0x04: Pickup04
-        //case 0x05: Pickup05
-        //case 0x06: Pickup06
-        //case 0x07: Pickup07
-        //case 0x08: Pickup08
+        case AsterixObjectType.Pickup03:
+            return readAsterixObjPickup03(stream);
+        case AsterixObjectType.Pickup04:
+            return readAsterixObjPickup04(stream);
+        case AsterixObjectType.Pickup05:
+            return readAsterixObjPickup05(stream);
+        case AsterixObjectType.Pickup06:
+            return readAsterixObjPickup06(stream);
+        case AsterixObjectType.Pickup07:
+            return readAsterixObjPickup07(stream);
+        case AsterixObjectType.Pickup08:
+            return readAsterixObjPickup08(stream);
         case AsterixObjectType.PushableBox:
             return readAsterixObjPushableBox(stream);
         case AsterixObjectType.Trampoline:
@@ -587,7 +711,7 @@ function readAsterixObjectPayload(stream: DataStream): AsterixObject | null {
         case AsterixObjectType.Elevator:
             return readAsterixObjElevator(stream);
         case AsterixObjectType.Button:
-            return readAsterixObjButton(stream);
+            return readAsterixObjButton(stream, version);
         //case 0x0D: _0D,
         //case 0x0E: _0E,
         //case 0x0F: _0F,
@@ -637,7 +761,7 @@ function readAsterixGenericObjects(stream: DataStream, offsets: number[], versio
                 preamble_unk = stream.readInt16();
             }
             let next_offset = stream.readInt16();
-            let payload = readAsterixObjectPayload(stream);
+            let payload = readAsterixObjectPayload(stream, version);
             let object: AsterixGenericObject = { preamble_pos, preamble_unk, payload };
             objects.push(object);
             curr_offset = next_offset;
@@ -646,7 +770,7 @@ function readAsterixGenericObjects(stream: DataStream, offsets: number[], versio
     return objects;
 }
 
-export function parse(buffer: ArrayBufferSlice, version: Version): AsterixLvl {
+export function parseLVL(buffer: ArrayBufferSlice, version: Version): AsterixLvl {
     const stream = new DataStream(buffer);
 
     const palette = readAsterixPalette(stream);
@@ -660,4 +784,34 @@ export function parse(buffer: ArrayBufferSlice, version: Version): AsterixLvl {
     const objects = readAsterixGenericObjects(stream, objectOffsets, version);
 
     return { palette, textureQuads, lvlHeader, vertexTable, materialAttrs, collisionSpans0, collisionSpans1, objectOffsets, objects };
+}
+
+
+export interface BillboardKeyframe {
+    left: number,
+    top: number,
+    right: number,
+    bottom: number,
+}
+
+export interface BillboardAnim {
+    keyframes: BillboardKeyframe[],
+}
+
+function readBillboardKeyframe(stream: DataStream): BillboardKeyframe {
+    const left = stream.readUint8();
+    const top = stream.readUint8();
+    const right = stream.readUint8();
+    const bottom = stream.readUint8();
+    return { left, top, right, bottom };
+}
+
+export function parseBillboardAnim(buffer: ArrayBufferSlice): BillboardAnim {
+    const stream = new DataStream(buffer);
+
+    let keyframes: BillboardKeyframe[] = [];
+    while (stream.offs+4 <= stream.buffer.byteLength) {
+        keyframes.push(readBillboardKeyframe(stream));
+    }
+    return { keyframes };
 }
