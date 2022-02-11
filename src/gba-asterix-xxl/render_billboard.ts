@@ -243,7 +243,7 @@ class BillboardInstance {
 
 class PickupInstance extends BillboardInstance {
     constructor(cache: GfxRenderCache, textureHolder: AsterixTextureHolder, public billboardData: BillboardData, public anim: BillboardAnim) {
-        super(cache, textureHolder, billboardData);)
+        super(cache, textureHolder, billboardData);
     }
 
     private getKeyframe(time: number): BillboardKeyframe {
