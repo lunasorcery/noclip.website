@@ -23,6 +23,34 @@ import { NITRO_Program } from '../SuperMario64DS/render';
 import { GfxrAttachmentSlot } from '../gfx/render/GfxRenderGraph';
 import { GfxRenderHelper } from '../gfx/render/GfxRenderHelper';
 
+class ComparisonRenderer implements Viewer.SceneGfx {
+    constructor(public renderers: Viewer.SceneGfx[]) {
+    }
+
+    public render(device: GfxDevice, viewerInput: Viewer.ViewerRenderInput) {
+        const switchRateMs = 500;
+        const currIdx = Math.floor((viewerInput.time / switchRateMs) % this.renderers.length);
+        this.renderers[currIdx].render(device, viewerInput);
+    }
+
+    public destroy(device: GfxDevice): void {
+        for (let i = 0; i < this.renderers.length; ++i)
+            this.renderers[i].destroy(device);
+    }
+}
+
+class ComparisonSceneDesc implements Viewer.SceneDesc {
+    constructor(public id: string, public name: string, public scenes: Viewer.SceneDesc[]) {
+    }
+
+    public createScene(device: GfxDevice, context: SceneContext): Promise<Viewer.SceneGfx> {
+        const dataFetcher = context.dataFetcher;
+        return Promise.all(this.scenes.map(scene => scene.createScene(device, context))).then((renderers) => {
+            return new ComparisonRenderer(renderers);
+        });
+    }
+}
+
 const pathBase = `mkds`;
 class ModelCache {
     private filePromiseCache = new Map<string, Promise<ArrayBufferSlice>>();
@@ -644,6 +672,16 @@ const sceneDescs = [
     new MarioKartDSSceneDesc("kiosk_mini_dokan_gc", "GCN Pipe Plaza"),
     new MarioKartDSSceneDesc("kiosk_donkey_course", "donkey_course (DK Pass Draft)"),
     new MarioKartDSSceneDesc("kiosk_MR_stage1", "MR_stage1 (Boss Room Draft)"),
+    "Comparison",
+    new ComparisonSceneDesc("compare_wario_stadium", "Wario Stadium", [
+        new MarioKartDSSceneDesc("stadium_course", "Wario Stadium"),
+        new MarioKartDSSceneDesc("wario_course", "wario_course (Wario Stadium Draft)"),
+    ]),
+    new ComparisonSceneDesc("compare_waluigi_pinball", "Waluigi Pinball", [
+        new MarioKartDSSceneDesc("pinball_course", "Waluigi Pinball"),
+        new MarioKartDSSceneDesc("donkey_course", "donkey_course (Waluigi Pinball Draft)"),
+        new MarioKartDSSceneDesc("luigi_course", "luigi_course (Waluigi Pinball Draft)"),
+    ]),
 ];
 
 export const sceneGroup: Viewer.SceneGroup = { id, name, sceneDescs };

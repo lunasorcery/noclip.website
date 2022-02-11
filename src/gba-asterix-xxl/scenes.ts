@@ -149,6 +149,34 @@ class AsterixProtoBSceneDesc extends AsterixSceneDesc {
     }
 }
 
+class ComparisonRenderer implements Viewer.SceneGfx {
+    constructor(public renderers: Viewer.SceneGfx[]) {
+    }
+
+    public render(device: GfxDevice, viewerInput: Viewer.ViewerRenderInput) {
+        const switchRateMs = 500;
+        const currIdx = Math.floor((viewerInput.time / switchRateMs) % this.renderers.length);
+        this.renderers[currIdx].render(device, viewerInput);
+    }
+
+    public destroy(device: GfxDevice): void {
+        for (let i = 0; i < this.renderers.length; ++i)
+            this.renderers[i].destroy(device);
+    }
+}
+
+class ComparisonSceneDesc implements Viewer.SceneDesc {
+    constructor(public id: string, public name: string, public scenes: Viewer.SceneDesc[]) {
+    }
+
+    public createScene(device: GfxDevice, context: SceneContext): Promise<Viewer.SceneGfx> {
+        const dataFetcher = context.dataFetcher;
+        return Promise.all(this.scenes.map(scene => scene.createScene(device, context))).then((renderers) => {
+            return new ComparisonRenderer(renderers);
+        });
+    }
+}
+
 const id = "gba-asterix-xxl";
 const name = "Asterix & Obelix: XXL";
 const sceneDescs = [
@@ -218,6 +246,59 @@ const sceneDescs = [
     new AsterixProtoBSceneDesc("proto-b-084bbf73", "084bbf73", "084bf1fd", "08012cc8", "Proto Greece 5"),
     new AsterixProtoBSceneDesc("proto-b-084d0aec", "084d0aec", "084d3210", "08012d04", "Proto Egypt 1"),
     new AsterixProtoBSceneDesc("proto-b-087b0000", "087b0000", "08790000", "08012cc8", "Test Area"),
+    "Comparison",
+    new ComparisonSceneDesc("compare-gaul-1", "Gaul 1", [
+        new AsterixRetailSceneDesc("", "0849571c", "084a3318", "0806ec14", ""),
+        new AsterixProtoBSceneDesc("", "0846c3dc", "08478f7e", "08012cc8", ""),
+    ]),
+    new ComparisonSceneDesc("compare-gaul-2", "Gaul 2", [
+        new AsterixRetailSceneDesc("", "084992b4", "084a3318", "0806ec14", ""),
+        new AsterixProtoBSceneDesc("", "0846fa2a", "08478f7e", "08012cc8", ""),
+    ]),
+    new ComparisonSceneDesc("compare-gaul-4", "Gaul 4", [
+        new AsterixRetailSceneDesc("", "0849cbe9", "084a3318", "0806ec14", ""),
+        new AsterixProtoBSceneDesc("", "08472f3e", "08478f7e", "08012cc8", ""),
+    ]),
+    new ComparisonSceneDesc("compare-gaul-5", "Gaul 5", [
+        new AsterixRetailSceneDesc("", "084a028d", "084a3318", "0806ec14", ""),
+        new AsterixProtoBSceneDesc("", "08476251", "08478f7e", "08012cc8", ""),
+    ]),
+    new ComparisonSceneDesc("compare-normandy-1", "Normandy 1", [
+        new AsterixRetailSceneDesc("", "084ba2a3", "084c9878", "0806ec14", ""),
+        new AsterixProtoBSceneDesc("", "0848ff09", "0849e8bb", "08012cc8", ""),
+    ]),
+    new ComparisonSceneDesc("compare-normandy-2", "Normandy 2", [
+        new AsterixRetailSceneDesc("", "084be00c", "084c9878", "0806ec14", ""),
+        new AsterixProtoBSceneDesc("", "084937dc", "0849e8bb", "08012cc8", ""),
+    ]),
+    new ComparisonSceneDesc("compare-normandy-3", "Normandy 3", [
+        new AsterixRetailSceneDesc("", "084c1cb0", "084c9878", "0806ec14", ""),
+        new AsterixProtoBSceneDesc("", "084971d2", "0849e8bb", "08012cc8", ""),
+    ]),
+    new ComparisonSceneDesc("compare-normandy-5", "Normandy 5", [
+        new AsterixRetailSceneDesc("", "084c5daf", "084c9878", "0806ec14", ""),
+        new AsterixProtoBSceneDesc("", "0849b00c", "0849e8bb", "08012cc8", ""),
+    ]),
+    new ComparisonSceneDesc("compare-greece-1", "Greece 1", [
+        new AsterixRetailSceneDesc("", "084de843", "084ebf2c", "0806ec14", ""),
+        new AsterixProtoBSceneDesc("", "084b2aee", "084bf1fd", "08012cc8", ""),
+    ]),
+    new ComparisonSceneDesc("compare-greece-2", "Greece 2", [
+        new AsterixRetailSceneDesc("", "084e275c", "084ebf2c", "0806ec14", ""),
+        new AsterixProtoBSceneDesc("", "084b6363", "084bf1fd", "08012cc8", ""),
+    ]),
+    new ComparisonSceneDesc("compare-greece-3", "Greece 3", [
+        new AsterixRetailSceneDesc("", "084e5bdf", "084ebf2c", "0806ec14", ""),
+        new AsterixProtoBSceneDesc("", "084b93ad", "084bf1fd", "08012cc8", ""),
+    ]),
+    new ComparisonSceneDesc("compare-greece-5", "Greece 5", [
+        new AsterixRetailSceneDesc("", "084e8a14", "084ebf2c", "0806ec14", ""),
+        new AsterixProtoBSceneDesc("", "084bbf73", "084bf1fd", "08012cc8", ""),
+    ]),
+    new ComparisonSceneDesc("compare-egpyt-1", "Egpyt 1", [
+        new AsterixRetailSceneDesc("", "0852196a", "085337d8", "0806ec50", ""),
+        new AsterixProtoBSceneDesc("", "084d0aec", "084d3210", "08012d04", ""),
+    ]),
 ];
 
 export const sceneGroup: Viewer.SceneGroup = { id, name, sceneDescs };
