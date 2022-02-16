@@ -13,10 +13,10 @@ interface AsterixUv {
 
 interface AsterixTextureQuad {
     flags: number; // bits 0-3: polygon type:
-                   //           0: invisible
-                   //           1: colored
-                   //           3: textured
-                   // bits 4-7: texture index
+    //           0: invisible
+    //           1: colored
+    //           3: textured
+    // bits 4-7: texture index
     uvs: AsterixUv[];
 }
 
@@ -41,13 +41,13 @@ interface AsterixVertex {
 interface AsterixMaterialAttr {
     textureQuadIndex: number;
     flags: number; // bit 0: render quality (0: use 1px quality, 1: use 2px cheap-render path)
-                   // bit 1: player can stand on this
-                   // bit 2: player can swim in this
-                   // bit 3: player will slip off this
-                   // bit 4: camera will point upwards at player
-                   // bit 5: seems to instantly kill the player
-                   // bit 6: used on one side of the first barrier wall in level1?
-                   // bit 7: also used on one side of the first barrier wall in level1, but on the floor
+    // bit 1: player can stand on this
+    // bit 2: player can swim in this
+    // bit 3: player will slip off this
+    // bit 4: camera will point upwards at player
+    // bit 5: seems to instantly kill the player
+    // bit 6: used on one side of the first barrier wall in level1?
+    // bit 7: also used on one side of the first barrier wall in level1, but on the floor
 }
 
 interface AsterixCollisionSpan {
@@ -58,11 +58,11 @@ interface AsterixCollisionSpan {
 interface AsterixTriPoly {
     indices: number[],
     flags: number, // bits 0-3: polygon type:
-                   //           0: invisible
-                   //           1: colored
-                   //           3: textured (1px)
-                   //           4: textured (2px)
-                   // bits 4-7: texture index
+    //           0: invisible
+    //           1: colored
+    //           3: textured (1px)
+    //           4: textured (2px)
+    // bits 4-7: texture index
     uvs: AsterixUv[],
 }
 
@@ -94,8 +94,8 @@ export interface AsterixCommonBillboard {
 }
 
 export interface AsterixCommonPickup {
-	billboard: AsterixCommonBillboard,
-	unk_bytes: number[], // [u8;8]
+    billboard: AsterixCommonBillboard,
+    unk_bytes: number[], // [u8;8]
 }
 
 export interface AsterixObjSolidModel {
@@ -182,7 +182,7 @@ export interface AsterixObjElevator {
 export interface AsterixObjButton {
     type: AsterixObjectType,
     state: number, // bits 0-6: number of attachments
-                   // bit 7:    is pressed
+    // bit 7:    is pressed
     pressed_model: AsterixTriModel,
     released_model: AsterixTriModel,
     attachment_offsets: number[],
@@ -216,6 +216,16 @@ export interface AsterixObjHintsNpc {
     probably_unaligned_bounds: AsterixUnalignedBounds, // probably
 }
 
+export interface AsterixObjLevelComplete {
+    type: AsterixObjectType,
+    animation_frame: number,
+    unk1: number,
+    model_id: number,
+    angle: number, // wraps at 0x400
+    pos: AsterixVertex,
+    probably_unaligned_bounds: AsterixUnalignedBounds, // probably
+}
+
 type AsterixObject =
     | AsterixObjSolidModel
     | AsterixObjIntangibleModel
@@ -231,7 +241,8 @@ type AsterixObject =
     | AsterixObjElevator
     | AsterixObjButton
     | AsterixObjCrate
-    | AsterixObjHintsNpc;
+    | AsterixObjHintsNpc
+    | AsterixObjLevelComplete;
 
 interface AsterixGenericObject {
     preamble_pos: AsterixVertex;
@@ -506,7 +517,7 @@ function readAsterixObjIntangibleModel(stream: DataStream): AsterixObjIntangible
 function readAsterixObjStaticBillboard(stream: DataStream): AsterixObjStaticBillboard {
     const billboard = readAsterixCommonBillboard(stream);
 
-    return { 
+    return {
         type: AsterixObjectType.StaticBillboard,
         billboard
     };
@@ -515,7 +526,7 @@ function readAsterixObjStaticBillboard(stream: DataStream): AsterixObjStaticBill
 function readAsterixObjPickup03(stream: DataStream): AsterixObjPickup03 {
     const pickup = readAsterixCommonPickup(stream);
 
-    return { 
+    return {
         type: AsterixObjectType.Pickup03,
         pickup
     };
@@ -524,7 +535,7 @@ function readAsterixObjPickup03(stream: DataStream): AsterixObjPickup03 {
 function readAsterixObjPickup04(stream: DataStream): AsterixObjPickup04 {
     const pickup = readAsterixCommonPickup(stream);
 
-    return { 
+    return {
         type: AsterixObjectType.Pickup04,
         pickup
     };
@@ -533,7 +544,7 @@ function readAsterixObjPickup04(stream: DataStream): AsterixObjPickup04 {
 function readAsterixObjPickup05(stream: DataStream): AsterixObjPickup05 {
     const pickup = readAsterixCommonPickup(stream);
 
-    return { 
+    return {
         type: AsterixObjectType.Pickup05,
         pickup
     };
@@ -543,7 +554,7 @@ function readAsterixObjPickup06(stream: DataStream): AsterixObjPickup06 {
     const pickup = readAsterixCommonPickup(stream);
     const unk1 = stream.readUint16();
 
-    return { 
+    return {
         type: AsterixObjectType.Pickup06,
         pickup,
         unk1
@@ -553,7 +564,7 @@ function readAsterixObjPickup06(stream: DataStream): AsterixObjPickup06 {
 function readAsterixObjPickup07(stream: DataStream): AsterixObjPickup07 {
     const pickup = readAsterixCommonPickup(stream);
 
-    return { 
+    return {
         type: AsterixObjectType.Pickup07,
         pickup
     };
@@ -562,7 +573,7 @@ function readAsterixObjPickup07(stream: DataStream): AsterixObjPickup07 {
 function readAsterixObjPickup08(stream: DataStream): AsterixObjPickup08 {
     const pickup = readAsterixCommonPickup(stream);
 
-    return { 
+    return {
         type: AsterixObjectType.Pickup08,
         pickup
     };
@@ -685,7 +696,7 @@ function readAsterixObjCrate(stream: DataStream): AsterixObjCrate {
     }*/
 
     return {
-        type:AsterixObjectType.Crate,
+        type: AsterixObjectType.Crate,
         unk1,
         model,
         broad_bounds,
@@ -703,7 +714,7 @@ function readAsterixObjHintsNpc(stream: DataStream): AsterixObjHintsNpc {
     const probably_unaligned_bounds = readAsterixUnalignedBounds(stream);
 
     return {
-        type:AsterixObjectType.HintsNpc,
+        type: AsterixObjectType.HintsNpc,
         hint_string_id,
         animation_frame,
         unk1,
@@ -711,6 +722,25 @@ function readAsterixObjHintsNpc(stream: DataStream): AsterixObjHintsNpc {
         pos,
         probably_unaligned_bounds
     };
+}
+
+function readAsterixObjLevelComplete(stream: DataStream): AsterixObjLevelComplete {
+    const animation_frame = stream.readUint8();
+    const unk1 = stream.readUint8();
+    const model_id = stream.readUint8();
+    const angle = stream.readUint16();
+    const pos = readAsterixVertex(stream);
+    const probably_unaligned_bounds = readAsterixUnalignedBounds(stream);
+
+    return {
+        type: AsterixObjectType.LevelComplete,
+        animation_frame,
+        unk1,
+        model_id,
+        angle,
+        pos,
+        probably_unaligned_bounds
+    }
 }
 
 function readAsterixObjectPayload(stream: DataStream, version: Version): AsterixObject | null {
@@ -756,7 +786,8 @@ function readAsterixObjectPayload(stream: DataStream, version: Version): Asterix
         //case 0x16: _16,
         //case 0x17: _17,
         //case 0x18: _18,
-        //case 0x19: LevelComplete
+        case AsterixObjectType.LevelComplete:
+            return readAsterixObjLevelComplete(stream);
         //case 0x1A: _1A,
         //case 0x1B: _1B,
         //case 0x1C: _1C,
@@ -841,7 +872,7 @@ export function parseBillboardAnim(buffer: ArrayBufferSlice): BillboardAnim {
     const stream = new DataStream(buffer);
 
     let keyframes: BillboardKeyframe[] = [];
-    while (stream.offs+4 <= stream.buffer.byteLength) {
+    while (stream.offs + 4 <= stream.buffer.byteLength) {
         keyframes.push(readBillboardKeyframe(stream));
     }
     return { keyframes };
