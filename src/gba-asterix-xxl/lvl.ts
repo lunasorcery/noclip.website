@@ -1,6 +1,6 @@
 
 import ArrayBufferSlice from "../ArrayBufferSlice";
-import { hexzero } from "../util";
+import { assert, hexzero } from "../util";
 import { DataStream } from "./DataStream";
 
 const V3D_LEVEL_WIDTH_CELLS = 12;
@@ -192,6 +192,30 @@ export interface AsterixObjButton {
     unk2: number, // unused?
 }
 
+interface AsterixEnemyPickup0F {
+    unk_shorts: number[],
+    unk_bytes: number[],
+    billboard: AsterixCommonBillboard | null, // Proto A
+    pickup: AsterixCommonPickup | null, // Proto B & Retail
+    unk_bytes_2: number[],
+}
+export interface AsterixObjEnemy0F {
+    type: AsterixObjectType,
+    unk1: number,
+    num_endvalues: number,
+    unk2: number,
+    unk3: number,
+    unk4: number,
+    num_pickups: number,
+    unk5: number,
+    unk6: number,
+    spawn_point: AsterixVertex,
+    tight_bounds: AsterixUnalignedBounds,
+    pickups: AsterixEnemyPickup0F[],
+    endvalues: number[],
+    unk7: number,
+}
+
 interface AsterixCrateEmbeddedObject {
     unk1: number,
     angle: number,
@@ -202,7 +226,7 @@ export interface AsterixObjCrate {
     unk1: number,
     model: AsterixTriModel,
     broad_bounds: AsterixAlignedBounds,
-    extra_xz_values: AsterixUnalignedBounds,
+    tight_bounds: AsterixUnalignedBounds,
     embedded_items: AsterixCrateEmbeddedObject[],
 }
 
@@ -240,6 +264,7 @@ type AsterixObject =
     | AsterixObjTrampoline
     | AsterixObjElevator
     | AsterixObjButton
+    | AsterixObjEnemy0F
     | AsterixObjCrate
     | AsterixObjHintsNpc
     | AsterixObjLevelComplete;
@@ -284,7 +309,7 @@ export const enum AsterixObjectType {
     Button = 0x0C,
     _0D = 0x0D,
     _0E = 0x0E,
-    _0F = 0x0F,
+    Enemy0F = 0x0F,
     _10 = 0x10,
     _11 = 0x11,
     _12 = 0x12,
@@ -680,11 +705,139 @@ function readAsterixObjButton(stream: DataStream, version: Version): AsterixObjB
     }
 }
 
+function readAsterixEnemyPickup0F(stream: DataStream, version: Version): AsterixEnemyPickup0F {
+    const unk_shorts = [
+        stream.readInt16(),
+        stream.readInt16(),
+        stream.readInt16(),
+        stream.readInt16(),
+        stream.readInt16(),
+    ];
+    const unk_bytes = [
+        stream.readUint8(),
+        stream.readUint8(),
+        stream.readUint8(),
+        stream.readUint8(),
+        stream.readUint8(),
+        stream.readUint8(),
+        stream.readUint8(),
+        stream.readUint8(),
+        stream.readUint8(),
+    ];
+    const billboard = (version == Version.PrototypeA) ? readAsterixCommonBillboard(stream) : null;
+    const pickup = (version != Version.PrototypeA) ? readAsterixCommonPickup(stream) : null;
+    const unk_bytes_2 = [
+        stream.readUint8(),
+        stream.readUint8(),
+    ];
+
+    assert(unk_shorts[1] >= -2 && unk_shorts[1] <= 1);
+    assert(unk_shorts[4] >= -1 && unk_shorts[4] <= 1);
+
+    assert(unk_bytes[0] == 0);
+    assert(unk_bytes[1] == 0);
+    assert(unk_bytes[2] == 0 || unk_bytes[2] == 1);
+    assert(unk_bytes[3] == 0);
+    assert(unk_bytes[4] == 0);
+    assert(unk_bytes[5] <= 2);
+    assert(unk_bytes[6] == 0);
+    assert(unk_bytes[7] == 0);
+    assert(unk_bytes[8] == 0);
+
+    if (billboard) {
+        assert(billboard.tex_id == 3);
+        assert(billboard.pos.x == 0);
+        assert(billboard.pos.y == 0);
+        assert(billboard.pos.z == 0);
+        assert(billboard.width == 0x26);
+        assert(billboard.height == 0x26);
+        assert(billboard.left == 0);
+        assert(billboard.top == 0);
+        assert(billboard.right == 0);
+        assert(billboard.bottom == 0);
+    }
+
+    if (pickup) {
+        assert(pickup.billboard.tex_id == 3);
+        assert(pickup.billboard.pos.x == 0);
+        assert(pickup.billboard.pos.y == 0);
+        assert(pickup.billboard.pos.z == 0);
+        assert(pickup.billboard.width == 0x26);
+        assert(pickup.billboard.height == 0x26);
+        assert(pickup.billboard.left == 0);
+        assert(pickup.billboard.top == 0);
+        assert(pickup.billboard.right == 0);
+        assert(pickup.billboard.bottom == 0);
+
+        assert(pickup.unk_bytes[0] == 0xff);
+        assert(pickup.unk_bytes[1] == 3 || pickup.unk_bytes[1] == 4);
+        assert(pickup.unk_bytes[2] == 0);
+        assert(pickup.unk_bytes[3] == 0);
+        assert(pickup.unk_bytes[4] == 0);
+        assert(pickup.unk_bytes[5] == 0);
+        assert(pickup.unk_bytes[6] == 0);
+        assert(pickup.unk_bytes[7] == 0);
+    }
+
+    assert(unk_bytes_2[0] == 0);
+    assert(unk_bytes_2[1] == 0);
+
+    return {
+        unk_shorts,
+        unk_bytes,
+        billboard,
+        pickup,
+        unk_bytes_2,
+    };
+}
+
+function readAsterixObjEnemy0F(stream: DataStream, version: Version): AsterixObjEnemy0F {
+    const unk1 = stream.readUint8();
+    const num_endvalues = stream.readUint8();
+    const unk2 = stream.readUint8();
+    const unk3 = stream.readUint8();
+    const unk4 = stream.readUint8();
+    const num_pickups = stream.readUint8();
+    const unk5 = stream.readUint8();
+    const unk6 = stream.readUint16();
+    const spawn_point = readAsterixVertex(stream);
+    const tight_bounds = readAsterixUnalignedBounds(stream);
+
+    let pickups: AsterixEnemyPickup0F[] = [];
+    for (let i = 0; i < num_pickups; ++i) {
+        pickups.push(readAsterixEnemyPickup0F(stream, version));
+    }
+
+    let endvalues: number[] = [];
+    for (let i = 0; i < num_endvalues; ++i) {
+        endvalues.push(stream.readUint16());
+    }
+
+    const unk7 = stream.readUint16();
+
+    return {
+        type: AsterixObjectType.Enemy0F,
+        unk1,
+        num_endvalues,
+        unk2,
+        unk3,
+        unk4,
+        num_pickups,
+        unk5,
+        unk6,
+        spawn_point,
+        tight_bounds,
+        pickups,
+        endvalues,
+        unk7
+    };
+}
+
 function readAsterixObjCrate(stream: DataStream): AsterixObjCrate {
     const unk1 = stream.readUint8();
     const model = readAsterixTriModel(stream);
     const broad_bounds = readAsterixAlignedBounds(stream);
-    const extra_xz_values = readAsterixUnalignedBounds(stream);
+    const tight_bounds = readAsterixUnalignedBounds(stream);
     const num_embedded_items = stream.readUint16();
     let embedded_items: AsterixCrateEmbeddedObject[] = [];
     // disabled until I write in parsing for types 3-8
@@ -700,7 +853,7 @@ function readAsterixObjCrate(stream: DataStream): AsterixObjCrate {
         unk1,
         model,
         broad_bounds,
-        extra_xz_values,
+        tight_bounds,
         embedded_items
     };
 }
@@ -774,7 +927,8 @@ function readAsterixObjectPayload(stream: DataStream, version: Version): Asterix
             return readAsterixObjButton(stream, version);
         //case 0x0D: _0D,
         //case 0x0E: _0E,
-        //case 0x0F: _0F,
+        case AsterixObjectType.Enemy0F:
+            return readAsterixObjEnemy0F(stream, version);
         //case 0x10: _10,
         //case 0x11: _11,
         //case 0x12: _12,

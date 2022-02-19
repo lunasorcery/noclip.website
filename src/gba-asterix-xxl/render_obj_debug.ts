@@ -1,5 +1,5 @@
 
-import { AsterixLvl, AsterixObjectType } from "./lvl";
+import { AsterixLvl, AsterixObjectType, AsterixObjEnemy0F } from "./lvl";
 import { GfxDevice, GfxFormat, GfxBufferUsage, GfxBuffer, GfxVertexAttributeDescriptor, GfxVertexBufferFrequency, GfxInputLayout, GfxInputState, GfxVertexBufferDescriptor, GfxBindingLayoutDescriptor, GfxProgram, GfxIndexBufferDescriptor, GfxInputLayoutBufferDescriptor, GfxMegaStateDescriptor, GfxCullMode } from "../gfx/platform/GfxPlatform";
 import * as Viewer from "../viewer";
 import { makeStaticDataBuffer, makeStaticDataBufferFromSlice } from "../gfx/helpers/BufferHelpers";
@@ -180,6 +180,19 @@ export class DebugRenderer {
                     case AsterixObjectType.Trampoline: break;
                     case AsterixObjectType.Elevator: break;
                     case AsterixObjectType.Button: break;
+                    case AsterixObjectType.Enemy0F: {
+                        const objEnemy0F = (payload as AsterixObjEnemy0F);
+                        this.addDebugModel(
+                            cache,
+                            textureHolder,
+                            vec3.fromValues(
+                                objEnemy0F.spawn_point.x,
+                                objEnemy0F.spawn_point.y,
+                                objEnemy0F.spawn_point.z
+                            )
+                        );
+                        break;
+                    }
                     case AsterixObjectType.Crate: break;
                     default: {
                         this.addDebugModel(cache, textureHolder, posVec);
