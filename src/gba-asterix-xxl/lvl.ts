@@ -833,20 +833,20 @@ function readAsterixObjEnemy0F(stream: DataStream, version: Version): AsterixObj
     };
 }
 
-function readAsterixObjCrate(stream: DataStream): AsterixObjCrate {
+function readAsterixObjCrate(stream: DataStream, version: Version): AsterixObjCrate {
     const unk1 = stream.readUint8();
     const model = readAsterixTriModel(stream);
     const broad_bounds = readAsterixAlignedBounds(stream);
     const tight_bounds = readAsterixUnalignedBounds(stream);
     const num_embedded_items = stream.readUint16();
     let embedded_items: AsterixCrateEmbeddedObject[] = [];
-    // disabled until I write in parsing for types 3-8
-    /*for (let i = 0; i < num_embedded_items; ++i) {
+
+    for (let i = 0; i < num_embedded_items; ++i) {
         const unk1 = stream.readUint8();
         const angle = stream.readUint8();
-        const object = readAsterixObjectPayload(stream);
+        const object = readAsterixObjectPayload(stream, version);
         embedded_items.push({ unk1, angle, object});
-    }*/
+    }
 
     return {
         type: AsterixObjectType.Crate,
@@ -934,7 +934,7 @@ function readAsterixObjectPayload(stream: DataStream, version: Version): Asterix
         //case 0x12: _12,
         //case 0x13: _13,
         case AsterixObjectType.Crate:
-            return readAsterixObjCrate(stream);
+            return readAsterixObjCrate(stream, version);
         case AsterixObjectType.HintsNpc:
             return readAsterixObjHintsNpc(stream);
         //case 0x16: _16,
