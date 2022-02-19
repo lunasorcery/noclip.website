@@ -1,5 +1,5 @@
 
-import { AsterixLvl, AsterixObjectType, AsterixObjSolidModel, AsterixObjIntangibleModel, AsterixObjPushableBox, AsterixObjTrampoline, AsterixObjElevator, AsterixObjCrate, AsterixXZ, AsterixAlignedBounds, AsterixUnalignedBounds } from "./lvl";
+import { AsterixLvl, AsterixObjectType, AsterixObjSolidModel, AsterixObjIntangibleModel, AsterixObjPushableBox, AsterixObjTrampoline, AsterixObjElevator, AsterixObjCrate, AsterixXZ, AsterixAlignedBounds, AsterixUnalignedBounds, AsterixObjEnemy0F, AsterixObjHintsNpc, AsterixObjLevelComplete } from "./lvl";
 import { GfxDevice, GfxFormat, GfxBufferUsage, GfxBuffer, GfxVertexAttributeDescriptor, GfxVertexBufferFrequency, GfxInputLayout, GfxInputState, GfxVertexBufferDescriptor, GfxBindingLayoutDescriptor, GfxProgram, GfxTexFilterMode, GfxMipFilterMode, GfxWrapMode, GfxIndexBufferDescriptor, GfxInputLayoutBufferDescriptor, GfxMegaStateDescriptor, GfxCullMode, GfxFrontFaceMode, GfxStencilOp, GfxCompareMode, GfxChannelWriteMask, GfxBlendMode, GfxBlendFactor } from "../gfx/platform/GfxPlatform";
 import * as Viewer from "../viewer";
 import { makeStaticDataBuffer, makeStaticDataBufferFromSlice } from "../gfx/helpers/BufferHelpers";
@@ -284,10 +284,35 @@ export class BoundsRenderer {
                         this.addAlignedBounds(cache, textureHolder, objPushableBox.xz_bounds_2);
                         break;
                     }
+                    case AsterixObjectType.Trampoline: {
+                        const objTrampoline = payload as AsterixObjTrampoline;
+                        this.addAlignedBounds(cache, textureHolder, objTrampoline.broad_bounds);
+                        break;
+                    }
+                    case AsterixObjectType.Elevator: {
+                        const objElevator = payload as AsterixObjElevator;
+                        this.addAlignedBounds(cache, textureHolder, objElevator.broad_bounds);
+                        break;
+                    }
+                    case AsterixObjectType.Enemy0F: {
+                        const objEnemy0F = payload as AsterixObjEnemy0F;
+                        this.addUnalignedBounds(cache, textureHolder, objEnemy0F.tight_bounds);
+                        break;
+                    }
                     case AsterixObjectType.Crate: {
                         const objCrate = payload as AsterixObjCrate;
                         this.addAlignedBounds(cache, textureHolder, objCrate.broad_bounds);
-                        this.addUnalignedBounds(cache, textureHolder, objCrate.extra_xz_values);
+                        this.addUnalignedBounds(cache, textureHolder, objCrate.tight_bounds);
+                        break;
+                    }
+                    case AsterixObjectType.HintsNpc: {
+                        const objHintsNpc = payload as AsterixObjHintsNpc;
+                        this.addUnalignedBounds(cache, textureHolder, objHintsNpc.probably_unaligned_bounds);
+                        break;
+                    }
+                    case AsterixObjectType.LevelComplete: {
+                        const objLevelComplete = payload as AsterixObjLevelComplete;
+                        this.addUnalignedBounds(cache, textureHolder, objLevelComplete.probably_unaligned_bounds);
                         break;
                     }
                 }
